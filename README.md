@@ -171,7 +171,8 @@ copies and checks the file, ejects the drive, then uploads the game again.
 The cart is the game as CHGame's SD menu takes it (`spec/chgame.md` in the
 CHGame repository): a ZIP with the release image, `CRITTERS.DAT` as the
 game's SD file, the box art (`EthansCritters/docs/cart.png`, painted by
-`tools/cart.py` from the game's own sprites and tileset) and the reel.
+`tools/cart.py` from the game's own sprites and tileset) and the licence.
+It carries no gameplay GIF: CHGame's spec keeps those out of carts.
 `chgame cart deploy out/EthansCritters.chgame --card E:\` lays out a card:
 `GAMES/ETHANSCR.CHG` for the menu, the file at the root for the game.
 

@@ -800,7 +800,9 @@ CRITTERS.DAT deflates 44.4 -> 13.4 MB). `chgame.json` gives id
 `ethans-critters`, the title, author, genre, `sdcard: ../out/card` (so the
 card file travels in the cart and lands at the card's root), the buttons;
 the version comes from config.h, the description from the README's first
-paragraph, the screenshot is the reel. `chgame cart prepare` lays out
+paragraph; no screenshots (CHGame's spec dropped them from carts on
+2026-10-07: gameplay GIFs stay in the game's project; a `screenshots` key in
+chgame.json is now an error, so keep it out). `chgame cart prepare` lays out
 `CRITTERS.DAT`, `GAMES/ETHANSCR.CHG` (59,904 B: the image and the picture),
 `COVER.PIC`, `MENU.BG`, `MENU.IDX`, `SYSTEM.PIC`. `launch` is not set, so a
 card made from it shows the menu (and the cover) at power-on; `chgame cart
@@ -851,6 +853,11 @@ runs `gh release create` with the notes and both files. Bump
 game's), which GitHub resolves to the repository's latest release. The
 CHGame checkout's tools now append a `[record]` block after the CHG
 file's picture (ETHANSCR.CHG 65,607 B; `chgpack verify` ok).
+The board package (0.3.0-local) was restaged from CHGame on 2026-10-07
+with its LTO in one partition (CHGame's review follow-ups): the same
+sources now build a release image of 50,180 B (was 50,372: the ~200 B
+this guide estimated for `-flto-partition=one`), RAM 17,800 unchanged.
+The simulator does not use the board package, so its frames are as before.
 
 ## The device
 

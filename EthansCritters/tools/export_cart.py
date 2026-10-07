@@ -4,9 +4,10 @@ installs from (CHGame's spec/chgame.md).
 
 The cart holds the release image, CRITTERS.DAT as the game's SD card file
 (the exporter puts it at the card's root, where the game reads it), the
-cover (docs/cart.png, drawn by tools/cart.py), the README's reel as the
-screenshot, and what chgame.json says (title, author, genre, buttons; the
-version from config.h, the description from the README's first paragraph).
+cover (docs/cart.png, drawn by tools/cart.py), the licence, and what
+chgame.json says (title, author, genre, buttons; the version from config.h,
+the description from the README's first paragraph). No screenshots: CHGame's
+spec keeps gameplay GIFs out of carts (the README's reel stays in the repo).
 
 Steps, in order, each stopping the run if it fails:
   1. tools/mkcard.py          the card file and src/assets/CardIndex.h, from the current sources

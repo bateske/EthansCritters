@@ -71,7 +71,7 @@ For the handheld's SD game menu, download the game from the project's
 [Releases](../../../releases/latest): the cart, `EthansCritters-<version>.chgame`,
 or the zip that unzips onto a FAT32 card's root. From a clone,
 `python EthansCritters/tools/export_cart.py` builds the cart (the release image, `CRITTERS.DAT`, the box art in
-`docs/cart.png`, this README's reel), and `chgame cart deploy
+`docs/cart.png`, the licence), and `chgame cart deploy
 EthansCritters.chgame --card E:\` from the CHGame repository's tools lays
 out a card: the menu lists the game and installs it, and the file sits at
 the card's root where the game reads it.

@@ -9,12 +9,6 @@
   ],
   "sdcard": "../out/card",
   "cartImage": "docs/cart.png",
-  "screenshots": [
-    {
-      "filename": "docs/gameplay.gif",
-      "title": "Title, the swamp, the fights, the toad"
-    }
-  ],
   "buttons": [
     {
       "control": "D-pad",
