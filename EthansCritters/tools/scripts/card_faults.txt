@@ -1,0 +1,56 @@
+# A card that stalls (M8a, src/engine/Card.h): every card user (the world,
+# the frame cache, the willows' passes, the toad, the clips, the title)
+# loses only its frame when a stream fails: the card is recovered
+# (sd::recover()), the frame is not sent (the panel keeps the last one),
+# and the next frame tries again; two lost in a row and the game waits
+# with the screen; 40 in a row (or a card recover() cannot bring back) and
+# it is the card screen. With the simulator's card as it is, nothing fails
+# (Z: lost=0) and this is a walk past each card user. Run it with faults:
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 CHSD_SIM_FAIL_EVERY=7 CHSD_SIM_JITTER_US=2000
+#     ec run tools/scripts/card_faults.txt out/card_faults
+# (every 7th stream fails part way, costing the 32 ms timeout: the snaps
+# are the same moments, a few frames later, never the card screen), or
+#   CHSD_SIM_COLD_US=300000 (each 1 MB of the card 0.3 s late on its first
+# read: the boot's warm-up, STIRRING THE SWAMP, takes them all; WARM ms=
+# says how long). tools/tests/sim_card_faults.py runs both and checks.
+wait 30
+snap title              # after the warm-up (the first boot with this card's data)
+tap A
+wait 10
+say Z0
+say W 162 478           # north of the hut, behind its willows: the world and his pass
+say C 0 184 470         # a raccoon beside him: the frame cache
+step 90
+say Z
+snap hut
+hold RIGHT
+step 120
+release
+snap walked
+say Z
+tap START 1             # the pause map: a clip
+step 20
+snap map
+tap START 1
+step 4
+say W 776 268           # The Rot's gate, every nest down: the brambles part
+say I1
+say D 0
+say D 1
+say D 2
+say D 3
+say D 4
+say D 5
+step 300
+hold UP
+step 16
+release                 # into the arena: the toad streams every frame
+say Z0
+step 150
+say Z
+snap toad
+say I0
+say H 20                # down: the death clip
+step 120
+snap dead
+say Z

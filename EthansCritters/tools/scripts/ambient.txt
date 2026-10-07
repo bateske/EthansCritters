@@ -1,0 +1,40 @@
+# The ambient phases (M8c): the world is on the card four times over, once
+# for each phase, and the game streams the phase of the moment (a step
+# every 16 ticks), so the whole swamp moves at no cost: the reeds' tops
+# lean one way and the other in a wave rolling across the beds, the
+# shallows' ripples sway, the deep water's chop swells (bands of rows a
+# pixel each way in turn), the waterline's glint laps, sun flecks blink
+# on the deep water, the lily pads dip, and over The Rot the gnats buzz.
+# The willows stand still. The same spot four times, 16 ticks apart (each
+# snap its own phase, the squire standing still); then a few seconds of
+# each as a GIF. No critter comes this far from the nests.
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/ambient.txt out/ambient
+wait 30
+say W 352 404           # Reed Shallows' east pond: reeds, shallows, deep water, lilies
+say I1
+step 128                # (the region's name gone)
+say Z0
+snap shallows_0
+step 16
+snap shallows_1
+step 16
+snap shallows_2
+step 16
+snap shallows_3
+step 16
+snap shallows_4         # the cycle round: phase 0 again (as shallows_0)
+gif shallows 48 4       # 192 ticks: three cycles
+say Z                   # the same 16-17 blocks a frame as ever
+say W 850 262           # The Rot, on its pond's south shore (just south of the arena's trigger): gnats, murk
+step 128
+snap rot_0
+step 16
+snap rot_1
+step 16
+snap rot_2
+step 16
+snap rot_3
+gif rot 48 4
+say W 916 400           # the stream east of Beaver Dam: reeds, a lily in flower, the willows still
+step 128
+gif stream 32 4

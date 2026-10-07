@@ -1,0 +1,74 @@
+# The sprites drawn in the world's stream (M8d, Play.cpp), under stress:
+# every draw that can overlap another, at every x phase of the camera. A
+# crowd of twelve (all four kinds, spawn puffs, a parry) walked left and
+# right; the hut's willows with critters behind and in front of him (his
+# pass held, what covers it after); Willow Hollow with chameleons about
+# him; critters straddling the screen's right edge (screen word 15, never
+# drawn in a wait). Every frame a GIF frame. A check of the drawing
+# order, not of gameplay: with
+#   CHSIM_FLAGS=-DECRT_HIDE_VERIFY=1 (and -DECRT_HIDE_US=1 or 100000)
+# its GIFs must equal a build without the hidden drawing (the M8d review:
+# also with the board knobs CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222).
+wait 30
+say W 262 636
+say I1
+say C 1 222 640
+say C 1 300 644
+say C 0 250 666
+say C 0 238 622
+say C 2 294 618
+say C 3 270 650
+say C 3 256 628
+say C 0 318 640
+say C 2 326 630
+say C 3 330 652
+say C 0 210 650
+say C 1 274 660
+step 2
+gif crowd_spawn 40 1
+hold RIGHT
+gif crowd_right 24 1
+release
+hold LEFT
+gif crowd_left 30 1
+release
+hold B
+gif crowd_parry 20 1
+release
+step 120
+gif crowd_late 60 1
+say W 162 478
+say C 0 184 470
+say C 3 152 476
+say C 0 172 476
+say C 3 170 466
+say C 2 188 486
+step 2
+gif hut_mix 40 1
+hold RIGHT
+gif hut_walk 40 1
+release
+say W 431 158
+say C 3 446 158
+say C 3 412 166
+say C 0 404 174
+say C 3 438 152
+step 2
+gif hollow_mix 60 1
+hold LEFT
+gif hollow_walk 40 1
+release
+say W 600 420
+say C 0 664 420
+say C 3 660 436
+say C 1 666 410
+say C 0 655 428
+say C 2 668 444
+step 2
+gif right_edge 60 1
+hold RIGHT
+gif right_walk 20 1
+release
+hold LEFT
+gif right_back 20 1
+release

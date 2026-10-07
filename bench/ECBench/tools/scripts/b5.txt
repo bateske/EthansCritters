@@ -1,0 +1,4 @@
+# B5: drawing costs.
+bench Z5
+snap draw
+summary

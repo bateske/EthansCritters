@@ -1,0 +1,4 @@
+# Boots, runs a second, and takes a picture.
+wait 60
+snap boot
+perf boot

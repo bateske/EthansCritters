@@ -1,0 +1,48 @@
+# The pause map (M7b). A new game from the title; he walks east from the
+# hut, the raccoon den by it falls (D0); START: the map of the swamp (a
+# Path F still streamed from the card) with the fog over every cell he has
+# not walked in (REMAP_SEPIA: a faded print on the parchment), the den he
+# cleared crossed out, The Rot's gate barred with brambles, and himself
+# blinking; START again plays on in the swamp's colours. Warped to the
+# gate with every nest down (D), the brambles part; paused there: the bar
+# gone, the cells round the gate and the hut lifted out of the fog, the
+# compass's gate; START in The Rot: its olive mood comes back with play.
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/pause.txt out/pause
+wait 30
+tap A                   # PRESS A: a new game
+wait 10
+hold RIGHT
+step 100
+release
+say D0                  # the den east of the hut falls
+step 60
+tap START 1
+step 4
+perf open               # (the card's time a frame: play's, and the frame that opened the map)
+snap map                # paused: the fog, the den crossed, the gate barred, him (blink on)
+step 16
+snap map_blink          # him off
+perf map                # the map a frame: 1 command, 16 blocks (its fog's remapRects not counted)
+step 30
+tap START 1
+step 4
+snap play_on            # playing on, in the swamp's colours
+say W 776 372           # south of the gate
+say I1
+say D 1
+say D 2
+say D 3
+say D 4
+say D 5                 # all six: THE ROT STIRS, then the brambles part
+step 260
+hold UP
+step 50
+release                 # through the gate into The Rot
+step 30
+tap START 1
+step 4
+snap map_open           # the gate open, the cells he walked in lifted, the six crossed
+tap START 1
+step 20
+snap rot_again          # The Rot's olive back
+say A

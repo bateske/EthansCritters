@@ -1,0 +1,6 @@
+# The boot measurements only (B1, B3): run with chdrive.py --device straight
+# after a power cycle (no upload), so B3 sees a card cold since power-up.
+bench Z1
+bench Z3
+snap card
+summary

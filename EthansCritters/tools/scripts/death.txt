@@ -1,0 +1,47 @@
+# Dying and getting up (M5; the death clip since M7b). By the raccoon den:
+# the far raccoon den is knocked down (D5: cleared nests stay cleared, and
+# it is saved), he takes a hit (H4), eats the red mushroom by the bushes
+# (the 48 come back when he dies), and the raccoons finish him (H10b: ten
+# half hearts from behind). The death row, the colour drains away, then the
+# death clip (Path F, its own dusk palette): THE SWAMP KEEPS YOU, the
+# critters edging in on him out of the dark, held; A: GET UP once it has
+# played, and A stands him up at the hut with full hearts, the den's pip
+# still filled, every mushroom back and every critter gone, in the swamp's
+# own colours again. A prints the actors and nests.
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/death.txt out/death
+wait 30
+say W 250 640
+step 3
+say D5                  # the raccoon den in the east falls
+step 20
+say H4                  # a raccoon's work
+step 24
+hold DOWN+LEFT          # down to the red mushroom by the bushes
+step 9
+hold DOWN
+step 40
+release
+step 2
+snap ate                # hurt, so he eats it: +1 heart
+say A
+step 30
+say H10b                # and they finish him
+step 2
+snap falling            # the death row, the dirge
+step 40
+snap draining           # the colour drains away
+step 30
+snap clip_start         # the death clip: THE SWAMP KEEPS YOU dithering in, the critters at the edges
+say A
+perf fall               # (the card's time a frame so far)
+step 50
+perf clip               # the clip a frame: 1 command, 16 blocks
+snap clip_mid           # the light closing in, the critters edging in
+step 50
+snap get_up             # held on its last frame; A: GET UP
+tap A
+step 4
+snap hut                # at the hut: full hearts, the east den's pip still filled, the swamp's colours
+say A
+step 30
+say Z

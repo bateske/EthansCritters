@@ -1,0 +1,74 @@
+# Play (M3+M4): A on the title starts the squire at the hut; he walks out
+# of The Landing on foot (the camera following, the world streamed every
+# frame), wades the shallows (slower), stops at deep water and at the
+# willows, thrusts and guards facing both ways, and the SELECT overlay
+# shows the frame stats. Then warps (W x y, his feet in world px) to the
+# regions too far to walk in a script; START pauses (the map), START plays on.
+# For the board's card timing:
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/play_walk.txt out/play_walk
+wait 30
+tap A
+wait 10
+snap start              # at the hut's door: the HUD strip, the region's name
+hold RIGHT
+wait 150                # east along the trodden path, past the raccoon den's bank
+snap path_east
+hold UP+RIGHT
+wait 100
+hold UP
+wait 40                 # north to the beaver pond's west shore (Beaver Dam)
+release
+snap pond_shore
+tap A 1
+wait 11
+snap thrust_right       # thrust f4: the blade out
+wait 20
+hold LEFT
+wait 4
+release
+tap A 1
+wait 11
+snap thrust_left        # mirrored
+wait 20
+hold B
+wait 14
+snap guard              # the guard up (parry f2), held
+release
+wait 20
+tap SELECT 1
+wait 6
+snap overlay            # C cmds B blocks us after gfx_wait, 60/30; M misses D deferred E entries bytes
+tap SELECT 1
+hold RIGHT
+wait 60                 # into the pond's shallows: wading, slower
+release
+snap wading
+hold RIGHT
+wait 80                 # the deep water stops him
+release
+snap pond_deep
+say Z                   # where he is and the frame stats so far
+say W 196 304           # Reed Shallows: the turtle's sandbar
+wait 2
+hold LEFT
+wait 90                 # off the sand into the shallows
+release
+snap shallows_wade
+say W 432 150           # Willow Hollow: the chameleons' clearing
+wait 2
+hold UP+RIGHT
+wait 40
+release
+snap hollow
+say W 776 344           # under the bramble gate into The Rot
+wait 2
+hold UP
+wait 60
+release
+snap rot
+tap START 1             # START: the pause map (M7b: pause.txt has it)
+wait 10
+snap paused
+tap START 1
+wait 10
+snap play_on            # START again: on in The Rot

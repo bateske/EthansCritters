@@ -1,0 +1,44 @@
+# The regions' moods (M6b): the palette mixed toward a colour, eased in
+# over about a second as the squire crosses into a region. The Landing,
+# Reed Shallows and Beaver Dam have none; Willow Hollow is a little dimmer
+# and greener (until its brood is cleared), The Rot a dark olive (until
+# its toad is beaten: boss_fight.txt). A warp (W) puts a region's mood on at once, so
+# the crossings are walked. A hurt's red screen (gfx_setFade) and the
+# death's grey go over the mood. I1 keeps the squire on his feet among
+# the critters on the way.
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/moods.txt out/moods
+wait 30
+say W 160 626           # The Landing, by the hut: no mood
+say I1
+step 30
+snap landing
+say W 196 304           # Reed Shallows, the turtle's sandbar: none
+step 30
+snap shallows
+say W 500 340           # Beaver Dam's north bank: none ...
+step 20
+snap dam
+hold UP                 # ... north into Willow Hollow: its mood eases in
+step 40
+release
+snap hollow_in          # half way
+step 40
+snap hollow             # dimmer and greener
+say W 604 212           # Willow Hollow's east end: east through the gap in the brambles
+step 10
+hold RIGHT
+step 40
+release
+snap rot_in             # into The Rot: the Hollow's green eases out, then the olive in
+step 90
+snap rot                # The Rot: a dark olive
+say H 2                 # a hurt: the red screen over the mood
+step 4
+snap rot_hurt
+step 30
+snap rot_after          # the red gone, the olive stays
+say D 4                 # the chameleon brood falls: Willow Hollow's mood is lifted
+say W 500 280
+step 30
+snap hollow_lifted
+say A

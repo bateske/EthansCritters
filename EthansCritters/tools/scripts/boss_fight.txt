@@ -1,0 +1,136 @@
+# The giant toad, OLD GULLET (M7a), beat by beat:
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/boss_fight.txt out/boss_fight
+# The six nests knocked down with D (I1 while the gate parts), then I0: he
+# walks into The Rot's arena, the brambles close behind him, the toad rises
+# out of the pond's murk and croaks its name; its first hop comes down on
+# him (a shadow growing where it will land, then the dust ring: no guard
+# stops it); its tongue is blocked (held B), taken (1.5 hearts), parried
+# (B tapped just before it: the toad stunned, a riposte and two more
+# blows); three blows stagger it (the damage row: it answers at once with
+# its tongue); half its HP knocked off with D: it roars, croaks two rot
+# raccoons out of the reeds (I1 from here), hops twice running; down to its
+# last HP with D (sitting: D 6 is ignored in the air), the killing blow: the
+# long hit-stop and shake, the death row, the fade, The Rot's olive
+# lifting, the win clip (M7b) with the times, and A: the title. Timed to
+# the tick like the other fight scripts (Rot.cpp's timings and the shared
+# RNG move the beats; the A lines say where the toad and he are).
+wait 30
+say W 776 268           # just inside The Rot, by the gate
+say I1
+say D 0
+say D 1
+say D 2
+say D 3
+say D 4
+say D 5                 # all six: THE ROT STIRS, then the brambles part (he is near)
+step 300
+say I0
+say A
+hold UP
+step 16
+release                 # into the arena: the fight
+step 10
+snap murk               # the brambles close behind him (a rasp, out of view); the murk stirs
+step 30
+snap rising             # the toad rises out of the murk, dithered in
+step 40
+snap name               # the croak: its name on a board, its bar on the HUD
+hold UP+RIGHT
+step 16
+release
+hold RIGHT
+step 9
+release                 # out to it, under where it will come down
+step 40
+say A
+step 90
+snap crouch             # it crouches (the tell): a shadow grows at his feet
+step 14
+snap airborne           # airborne: it cannot be hit, it hurts nobody
+step 16
+snap landed             # down on him: the ground shakes, the dust ring, a heart off him
+say A
+step 20                 # his hurt row; then out level with it, to its right
+hold RIGHT
+step 24
+release
+tap LEFT 1              # facing it
+hold B
+step 66
+snap tell               # the tongue's tell: the mouth gapes, a glint in its throat
+step 13
+snap blocked            # held B: the tongue snaps back off the guard
+step 1
+release
+say A
+step 120
+snap taken              # standing in its lane unguarded: the tongue, a heart and a half
+step 26
+say A
+step 12
+hold LEFT
+step 18
+release                 # closer (a riposte must reach it), facing it
+step 76
+tap B 1                 # B tapped just before the lash
+step 4
+snap parried            # parried: the toad stunned
+step 6
+tap A 1                 # the riposte
+step 12
+snap riposte
+step 11
+tap A 1
+step 19
+tap A 1
+step 19
+say A
+step 14
+tap A 1
+step 14
+snap flash              # a blow: its red flash (a red copy of the frame, from the card)
+step 5
+tap A 1
+step 19
+tap A 1
+step 26
+snap stagger            # the third blow: the damage row
+say A
+say I1
+say D 6 12              # down to half its HP: angry
+step 20
+snap angry              # it roars, the ground shakes
+step 150
+snap rot_raccoons       # two rot raccoons out of the reeds, at him
+say A
+step 60
+say A
+hold DOWN
+step 30
+release                 # out of its lane: it hops at him, twice running
+say A
+step 85
+snap double_hop_1       # the first hop, in the air
+step 45
+snap double_hop_2       # the second, at once
+say A
+step 40
+say D 6 1               # down to its last HP, sitting (D 6 is ignored in the air: the sword could not find it)
+say A
+tap A 1                 # the killing blow
+step 14
+snap death_blow         # a long hit-stop, a big shake; its rot raccoons fall with it
+step 50
+snap slump              # the death row: it slumps
+step 70
+snap fade               # dithered away
+step 60
+snap quiet              # the swamp is quiet: The Rot's olive lifting, the brambles parting
+say A
+step 120
+snap win_clip           # the win clip (M7b; win.txt has it frame by frame): the mist over the pond
+step 160
+snap win_times          # held, the run's time and the best time under it
+tap A
+wait 10
+snap title              # A: back to the title (BEST, CONTINUE / NEW GAME)

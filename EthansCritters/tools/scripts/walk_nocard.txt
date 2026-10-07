@@ -1,0 +1,17 @@
+# The card pulled out mid-walk (X0): the next frame's world stream fails
+# and the game says INSERT CARD; put back (X1), A tries again and the title
+# is back (the same A does not start the walk too); A walks again.
+wait 30
+tap A
+wait 10
+snap walk
+say X0
+wait 32             # (A: TRY AGAIN blinks: on)
+snap pulled
+say X1
+tap A
+wait 10
+snap title_again
+tap A
+wait 4
+snap walk_again

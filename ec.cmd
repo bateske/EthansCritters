@@ -1,0 +1,3 @@
+@echo off
+rem The CHGame tools on this project's sketch: ec build, ec run tools\scripts\smoke.txt out\smoke, ec check ...
+python "%~dp0chgame\tools\chgame.py" --sketch "%~dp0EthansCritters" %*

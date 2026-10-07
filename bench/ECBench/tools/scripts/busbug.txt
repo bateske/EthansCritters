@@ -1,0 +1,4 @@
+# The simulator's bus-rule check: Z9 streams while a flush is on the wire,
+# so this run must end with a BUG report (and a nonzero exit).
+bench Z9
+wait 2

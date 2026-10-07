@@ -1,0 +1,416 @@
+From f7f5dbcee470481aabbfadd190919782659466bc Mon Sep 17 00:00:00 2001
+From: bateske <kevin@bateske.com>
+Date: Sat, 3 Oct 2026 21:09:50 -0700
+Subject: [PATCH] CHGfx P5: gfx_blit4k remaps and inks through a table of pixel
+ pairs
+
+Remap and ink fold into one colour map M (the remap, then the ink over
+all but 15; M[15] is always 15, so the key stays the key and the
+table's entry 15 is still never read), spread over a 256-byte table T
+of pixel pairs that each remapped or inked call builds (64 word stores)
+on the stack of a function of its own: a load per two pixels instead of
+a nibble at a time, ~22 instructions a source word instead of ~80. A
+mirrored remap is the same loop reading from the row's last byte back
+(T holds the pairs swapped). Plain, mirrored and dithered blits build no
+table and keep their stack depth.
+
+All paths: the copy loop is picked once a row instead of every flag
+being tested every word, the mirror is a rotate and two delta swaps
+(fewer live constants, no spills), and the merge loop keeps the previous
+word in a register and tests at the bottom (~26 instructions a word
+stored, was ~28).
+
+Output unchanged: the host test (P4's cases, plus every pixel pair with
+both flips at every x phase, tables with entries above 15 and of 15, a
+table changed between calls, REMAP without a table) passes against the
+same pixel-at-a-time reference, and CHGfx's own 19,962 checks pass. SRAM
+part 538 -> 632 bytes, still no calls out of it; remapped and inked
+calls take 256 more bytes of stack. Expected on the board (32x32, from
+the disassembly and a cycle model fitted to P4's measured numbers):
+remapped ~235 us (was 455), mirrored ~195 (237), plain ~134 / ~153 at
+x % 8 = 0 / 3 (149 / 170). Images that do not call it are byte-identical
+(CHWords, CHWordWheel, CHCrossword against the pristine and the P4
+CHGfx).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../arduino/CHGame/libraries/CHGfx/README.md  |   6 +-
+ .../CHGfx/extras/tests/blit4k/test_blit4k.cpp |  70 +++++--
+ .../CHGame/libraries/CHGfx/src/CHGfx.h        |   3 +-
+ .../libraries/CHGfx/src/CHGfx_blit4k.cpp      | 174 ++++++++++++------
+ 4 files changed, 185 insertions(+), 68 deletions(-)
+
+diff --git a/platform/board/arduino/CHGame/libraries/CHGfx/README.md b/platform/board/arduino/CHGame/libraries/CHGfx/README.md
+index 7ecc82a..5eb2eec 100644
+--- a/platform/board/arduino/CHGame/libraries/CHGfx/README.md
++++ b/platform/board/arduino/CHGame/libraries/CHGfx/README.md
+@@ -290,8 +290,10 @@ costs the same (a funnel shift into the framebuffer's words, eight pixels
+ tested for the key at a time). Flags mirror it (`GFX_B4_FLIPH`), recolour
+ it (`GFX_B4_REMAP`), paint it in one ink (`GFX_B4_SOLID | GFX_B4_INK(c)`,
+ a hit flash) or stipple it through a 4x4 Bayer matrix anchored to the
+-screen (`GFX_B4_DITHER`, level 0..16: fades and shimmer). About 540 bytes
+-of SRAM once a sketch calls it.
++screen (`GFX_B4_DITHER`, level 0..16: fades and shimmer). Remap and ink go
++through a 256-byte table of pixel pairs that each such call builds on its
++stack, so they cost a lookup per two pixels. About 630 bytes of SRAM once a
++sketch calls it.
+ 
+ ```cpp
+ gfx_blit4k(frame, x, y, wWords, h, facingLeft ? GFX_B4_FLIPH : 0);
+diff --git a/platform/board/arduino/CHGame/libraries/CHGfx/extras/tests/blit4k/test_blit4k.cpp b/platform/board/arduino/CHGame/libraries/CHGfx/extras/tests/blit4k/test_blit4k.cpp
+index 36a4bbc..af995f3 100644
+--- a/platform/board/arduino/CHGame/libraries/CHGfx/extras/tests/blit4k/test_blit4k.cpp
++++ b/platform/board/arduino/CHGame/libraries/CHGfx/extras/tests/blit4k/test_blit4k.cpp
+@@ -3,8 +3,11 @@
+  * density from none to most), every x phase and far off every edge, both
+  * flips, random remaps (entries of 15 included), solid ink, every dither
+  * level, and random clip rectangles (empty ones, single columns, every
+- * edge). The whole framebuffer is compared after each call, so a stray
+- * store outside the sprite or the clip fails too.
++ * edge). The byte map that remap and ink go through gets every pixel pair
++ * (sprites holding each byte value once) with both flips at every x phase,
++ * tables with entries above 15, a table changed between calls, and REMAP
++ * without a table. The whole framebuffer is compared after each call, so a
++ * stray store outside the sprite or the clip fails too.
+  *
+  * Self-contained, so in a folder of its own (chsim.py test links every
+  * extras/tests/*.cpp with the whole library into one program): only
+@@ -45,7 +48,7 @@ static void reference(const uint8_t *src, int x, int y, int ww, int h, uint8_t f
+         for (int j = 0; j < w; j++) {
+             int sj = (fl & GFX_B4_FLIPH) ? w - 1 - j : j;
+             uint8_t v = (src[r * ww * 4 + (sj >> 1)] >> ((sj & 1) * 4)) & 15;
+-            if ((fl & GFX_B4_REMAP) && v != 15) v = remap[v] & 15;
++            if ((fl & GFX_B4_REMAP) && remap && v != 15) v = remap[v] & 15;   /* (nullptr: tolerated, no remap) */
+             if (v == 15 || ((fl & GFX_B4_SOLID) && (fl >> 4) == 15)) continue;     /* ink 15: the key */
+             int X = x + j, Y = y + r;
+             if (X < k.x0 || X >= k.x1 || Y < k.y0 || Y >= k.y1) continue;
+@@ -55,16 +58,11 @@ static void reference(const uint8_t *src, int x, int y, int ww, int h, uint8_t f
+ }
+ 
+ static int checks, fails;
++static uint32_t buf[16 * 40 + 1];
+ 
+-static void one(int ww, int h, int x, int y, uint8_t fl, const uint8_t *remap, uint8_t level, int keyPct,
+-                const char *what) {
+-    static uint32_t buf[16 * 40 + 1];
+-    uint8_t *src = (uint8_t *)buf;
+-    for (int i = 0; i < ww * 4 * h; i++) {
+-        uint8_t b = 0;
+-        for (int n = 0; n < 2; n++) b |= (uint8_t)((rr(0, 99) < keyPct ? 15 : rr(0, 14)) << (4 * n));
+-        src[i] = b;
+-    }
++/* The blit of buf against the reference, on a random framebuffer. */
++static void check(int ww, int h, int x, int y, uint8_t fl, const uint8_t *remap, uint8_t level, const char *what) {
++    const uint8_t *src = (const uint8_t *)buf;
+     for (int i = 0; i < GFX_FB_BYTES; i++) gfx_fb[i] = want[i] = (uint8_t)rnd();
+     reference(src, x, y, ww, h, fl, remap, level);
+     gfx_blit4k(src, x, y, ww, h, fl, remap, level);
+@@ -81,6 +79,28 @@ static void one(int ww, int h, int x, int y, uint8_t fl, const uint8_t *remap, u
+     }
+ }
+ 
++/* A random sprite (keyPct% of its pixels 15), then check(). */
++static void one(int ww, int h, int x, int y, uint8_t fl, const uint8_t *remap, uint8_t level, int keyPct,
++                const char *what) {
++    uint8_t *src = (uint8_t *)buf;
++    for (int i = 0; i < ww * 4 * h; i++) {
++        uint8_t b = 0;
++        for (int n = 0; n < 2; n++) b |= (uint8_t)((rr(0, 99) < keyPct ? 15 : rr(0, 14)) << (4 * n));
++        src[i] = b;
++    }
++    check(ww, h, x, y, fl, remap, level, what);
++}
++
++/* Every byte value once, shuffled: 16 words x 4 rows, every pixel pair the byte map has. */
++static void allPairs() {
++    uint8_t *src = (uint8_t *)buf;
++    for (int i = 0; i < 256; i++) src[i] = (uint8_t)i;
++    for (int i = 255; i > 0; i--) {
++        int k = rr(0, i);
++        uint8_t t = src[i]; src[i] = src[k]; src[k] = t;
++    }
++}
++
+ static void setClip(int x0, int y0, int x1, int y1) {
+     gfx__clip.x0 = (int16_t)x0; gfx__clip.y0 = (int16_t)y0;
+     gfx__clip.x1 = (int16_t)x1; gfx__clip.y1 = (int16_t)y1;
+@@ -112,6 +132,32 @@ int main(int argc, char **argv) {
+         one(ww, rr(0, 40), rr(-ww * 8 - 4, 132), rr(-44, 132), f, remap, (uint8_t)rr(0, 16), rr(0, 100), "clip");
+     }
+ 
++    /* The byte map (remap and ink): every pixel pair, both flips, every x phase, remap entries
++     * above 15 (only the low nibble counts) and of 15 (transparent), entry 15 not 15 (ignored),
++     * every ink including 15 (nothing). */
++    setClip(0, 0, GFX_W, GFX_H);
++    for (int i = 0; i < (quick ? 64 : 640); i++) {
++        static const uint8_t FL[6] = {GFX_B4_REMAP, GFX_B4_SOLID, GFX_B4_REMAP | GFX_B4_SOLID,
++                                      GFX_B4_REMAP | GFX_B4_DITHER, GFX_B4_SOLID | GFX_B4_DITHER, GFX_B4_REMAP};
++        for (int j = 0; j < 16; j++) remap[j] = (uint8_t)(rr(0, 3) ? rr(0, 15) : rnd());
++        allPairs();
++        uint8_t f = (uint8_t)(FL[i % 6] | (i / 6 % 2 ? GFX_B4_FLIPH : 0) | (rr(0, 15) << 4));
++        check(16, 4, (i % 8) + 8 * rr(-2, 14), rr(-2, 126), f, remap, (uint8_t)rr(0, 16), "map");
++    }
++
++    /* The same table changed between calls, and flipped and not in turn: nothing kept from the last call. */
++    for (int i = 0; i < 48; i++) {
++        for (int j = 0; j < 16; j++) remap[j] = (uint8_t)rr(0, 15);
++        allPairs();
++        check(16, 4, 3 + i, 40, (uint8_t)(GFX_B4_REMAP | (i & 1)), remap, 16, "map again");
++    }
++
++    /* REMAP with no table: drawn plain (or inked), as the reference does. */
++    for (int i = 0; i < 32; i++)
++        one(rr(1, 8), rr(1, 30), rr(-10, 100), rr(-10, 100),
++            (uint8_t)(GFX_B4_REMAP | (i & 1) | (i & 2 ? GFX_B4_SOLID | GFX_B4_INK(rr(0, 15)) : 0)), nullptr, 16,
++            rr(0, 60), "no table");
++
+     /* Each dither level alone over a solid block: exactly level/16 of the pixels. */
+     setClip(0, 0, GFX_W, GFX_H);
+     for (int lv = 0; lv <= 16; lv++) {
+diff --git a/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.h b/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.h
+index af404cb..873617e 100644
+--- a/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.h
++++ b/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.h
+@@ -348,7 +348,8 @@ void gfx_blit(const uint8_t *spr, int x, int y, int w, int h, int transparent);
+  * 4i..4i+3); colour 15 is transparent. Any x: each row is funnel-shifted
+  * into the framebuffer's words and merged under a mask of its opaque
+  * pixels, so it costs the same at every x. Clipped to the clip
+- * rectangle. ~540 bytes of SRAM when used. flags:
++ * rectangle. ~630 bytes of SRAM when used; a remapped or inked call also
++ * takes 256 bytes of stack for its table. flags:
+  *   GFX_B4_FLIPH   mirror the whole padded width (wWords * 8 px)
+  *   GFX_B4_REMAP   pixel = remap[pixel] (16 entries; 15 stays transparent,
+  *                  and an entry of 15 makes that colour transparent)
+diff --git a/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx_blit4k.cpp b/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx_blit4k.cpp
+index d9f6655..2131d02 100644
+--- a/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx_blit4k.cpp
++++ b/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx_blit4k.cpp
+@@ -16,16 +16,31 @@
+  * the store is (d & ~m) | (c & m), skipped when m is 0 (most words at a
+  * sprite's edges).
+  *
+- * Split in two for RAM: the setup (clip, masks, tables) runs once a call
+- * from flash, and only the row loops sit in SRAM (each GFX_RAMFUNC costs
+- * its size in RAM; all of it in SRAM was ~820 bytes, the rows alone are
+- * ~540). Each source row is first copied (flipped, remapped, inked) into
+- * a row of words on the stack with a key word either side; the merge loop
+- * then reads two neighbours per output word, visits only the columns
+- * inside the clip and has no per-flag branches: ~27 instructions a word
+- * stored, ~22 a word left alone. Remap goes nibble by nibble: a 256-entry
+- * byte-pair table costs ~256 steps to build, as much as a 24x21 sprite's
+- * remap, and 256 bytes of stack. An ink of 15 is the key: nothing shows.
++ * Split in two for RAM: the setup (clip, masks) runs once a call from
++ * flash, and only the row loops sit in SRAM (each GFX_RAMFUNC costs its
++ * size in RAM; all of it in SRAM was ~820 bytes, this is ~630). Each
++ * source row is first copied into a row of words on the stack with a key
++ * word either side, by one of three loops picked once a row: a word copy;
++ * a mirror (words from the end, each word's nibbles reversed by a rotate
++ * and two delta swaps); or a byte map for remap and ink. The merge loop
++ * then funnels two neighbours into each output word (the previous one
++ * kept in a register), visits only the columns inside the clip and has no
++ * per-flag branches: ~26 instructions a word stored, ~21 a word left
++ * alone.
++ *
++ * The byte map. Remap and ink fold into one colour map M (the remap, then
++ * the ink wherever the result is not 15), and M[15] is always 15: the key
++ * stays the key whatever the remap table says, and the table's entry 15
++ * is never read. M is spread over a table of 256 bytes,
++ *     T[lo | hi << 4] = M[lo] | M[hi] << 4
++ * (M[hi] | M[lo] << 4 for a flipped blit), so a source byte, two pixels,
++ * is one load from T: four a word, ~22 instructions with the stores, and
++ * a flipped row is the same loop reading from the row's last byte back.
++ * Before, the remap went a nibble at a time (~80 instructions a word) and
++ * a remapped blit cost ~3x a plain one. Building T is 64 word stores, 16
++ * colours times four low ones (~10 us with M); T lives on the stack of a
++ * function of its own, so only remapped and inked blits pay its 256
++ * bytes. An ink of 15 is the key: nothing shows.
+  *
+  * The row function keeps its frame pointer on purpose: with
+  * -msave-restore GCC may otherwise save registers through __riscv_save_N,
+@@ -40,18 +55,22 @@
+ #endif
+ 
+ #define B4_MAXW (GFX_W / 8)
++#define B4_FLIP 1u                  /* = GFX_B4_FLIPH */
++#define B4_MAP  2u                  /* through the byte map T */
+ 
+ namespace {
+ struct B4Job {
+     const uint32_t *row;            /* the first source row drawn */
+     uint32_t *fb;                   /* its framebuffer row, at word column xw (output word 0) */
++    uint8_t *tab;                   /* B4_MAP: T, 256 bytes, built by the row function */
++    const uint8_t *remap;           /* B4_MAP: M from remap[0..14] ... */
+     int words, rows, y;             /* source words a row; rows drawn; the first one's y */
+-    int oa, ob;                     /* output words inside the clip: [oa, ob) */
++    int oa, ob;                     /* output words inside the clip: [oa, ob), never empty */
+     uint32_t sh, rs;                /* funnel: cur << sh | (prev >> 1) >> rs */
+     uint32_t ma, mb;                /* clip masks of words oa and ob - 1 */
+-    uint32_t ink, dither[4];        /* solid colour in every nibble (not 15); Bayer mask by y & 3 */
+-    uint8_t remap[16];              /* 15 kept */
+-    bool flip, rm, solid;
++    uint32_t dither[4];             /* Bayer mask by y & 3 */
++    uint32_t keep, ink;             /* ... then c (not 15) -> (c & keep) | ink */
++    uint32_t mode;                  /* B4_FLIP, B4_MAP */
+ };
+ }
+ 
+@@ -67,47 +86,92 @@ GFX_RAMFUNC(blit4k) B4_NOSAVE static void blit4kRows(const B4Job &j) {
+     int words = j.words;
+     rb[0] = ~0u;
+     rb[words + 1] = ~0u;
+-    bool plain = !(j.flip | j.rm | j.solid);
++    if (j.mode & B4_MAP) {
++        /* M in T's first 16 bytes */
++        uint8_t *tab = j.tab;
++        const uint8_t *rp = j.remap;
++        uint32_t keep = j.keep, ink = j.ink;
++        for (uint32_t i = 0; i < 15; i++) {
++            uint32_t c = rp[i] & 15;
++            if (c != 15) c = (c & keep) | ink;
++            tab[i] = (uint8_t)c;
++        }
++        tab[15] = 15;
++        /* T a word (a high colour and four low ones) at a time, from the
++         * top down, so M is read before its bytes are overwritten */
++        uint32_t f = (j.mode & B4_FLIP) * 4, *t = (uint32_t *)tab;
++        uint32_t l0 = t[0] << f, l1 = t[1] << f, l2 = t[2] << f, l3 = t[3] << f;
++        t += 64;
++        for (const uint8_t *h = tab + 16; h != tab;) {
++            uint32_t v = ((uint32_t)*--h << (4 - f)) * 0x01010101u;
++            t -= 4;
++            t[0] = v | l0;
++            t[1] = v | l1;
++            t[2] = v | l2;
++            t[3] = v | l3;
++        }
++    }
+     const uint32_t *row = j.row;
+     uint32_t *fb = j.fb;
+-    for (int n = j.rows, y = j.y; n > 0; n--, y++, row += words, fb += GFX_FB_STRIDE / 4) {
+-        uint32_t *w = rb + 1, *we = w + words;
+-        if (plain) {
+-            for (const uint32_t *s = row; w < we;) *w++ = *s++;
+-        } else {
+-            for (const uint32_t *s = row + words; w < we;) {
+-                uint32_t v;
+-                if (j.flip) {               /* words from the end, nibbles reversed */
+-                    v = *--s;
+-                    v = (v >> 16) | (v << 16);
+-                    v = ((v >> 8) & 0x00FF00FFu) | ((v & 0x00FF00FFu) << 8);
+-                    v = ((v >> 4) & 0x0F0F0F0Fu) | ((v & 0x0F0F0F0Fu) << 4);
+-                } else {
+-                    v = row[w - rb - 1];
+-                }
+-                if (j.rm) {
+-                    uint32_t u = 0;
+-                    for (uint32_t b = 0; b < 32; b += 4) u |= (uint32_t)j.remap[(v >> b) & 15] << b;
+-                    v = u;
+-                }
+-                if (j.solid) {              /* the ink wherever it is not the key */
+-                    uint32_t k = keyMask(v);
+-                    v = (v & k) | (j.ink & ~k);
+-                }
+-                *w++ = v;
++    int n = j.rows, y = j.y;
++    do {
++        uint32_t *w = rb + 1, *we = w + words, mode = j.mode;
++        if (mode & B4_MAP) {        /* two pixels a load from T; flipped, from the row's last byte back */
++            const uint8_t *s = (const uint8_t *)row, *tab = j.tab;
++            int st = 1;
++            if (mode & B4_FLIP) {
++                s = (const uint8_t *)(row + words) - 1;
++                st = -1;
+             }
++            uint8_t *o = (uint8_t *)w;
++            do {
++                uint32_t a = *s; s += st;
++                uint32_t b = *s; s += st;
++                uint32_t c = *s; s += st;
++                uint32_t d = *s; s += st;
++                a = tab[a]; b = tab[b]; c = tab[c]; d = tab[d];
++                o[0] = (uint8_t)a; o[1] = (uint8_t)b; o[2] = (uint8_t)c; o[3] = (uint8_t)d;
++                o += 4;
++            } while (o < (uint8_t *)we);
++        } else if (mode) {          /* mirrored: words from the end, nibbles reversed */
++            const uint32_t *s = row + words;
++            do {
++                uint32_t v = *--s;
++                v = (v >> 16) | (v << 16);
++                uint32_t t = (v ^ (v >> 8)) & 0x00FF00FFu;  /* bytes swapped in each half */
++                v ^= t ^ (t << 8);
++                t = (v ^ (v >> 4)) & 0x0F0F0F0Fu;           /* nibbles swapped in each byte */
++                *w++ = v ^ t ^ (t << 4);
++            } while (w < we);
++        } else {
++            const uint32_t *s = row;
++            do *w++ = *s++; while (w < we);
+         }
+         /* merge: output word o is rb[o + 1] funnelled with rb[o] */
+         uint32_t dm = j.dither[y & 3], em = j.ma, sh = j.sh, rs = j.rs;
+         const uint32_t *r = rb + j.oa;
+-        for (uint32_t *d = fb + j.oa, *de = fb + j.ob; d < de; d++, r++) {
+-            uint32_t c = (r[1] << sh) | ((r[0] >> 1) >> rs);
++        uint32_t p = *r, *d = fb + j.oa, *de = fb + j.ob;
++        do {
++            uint32_t q = *++r;
++            uint32_t c = (q << sh) | ((p >> 1) >> rs);
++            p = q;
+             if (d == de - 1) em &= j.mb;
+             uint32_t m = ~keyMask(c) & dm & em;
+             em = ~0u;
+             if (m) *d = (*d & ~m) | (c & m);
+-        }
+-    }
++        } while (++d < de);
++        row += words;
++        fb += GFX_FB_STRIDE / 4;
++        y++;
++    } while (--n);
++}
++
++/* Remapped or inked: T on this function's stack, so other blits do not
++ * pay for it. */
++static __attribute__((noinline)) void blit4kMapped(B4Job &j) {
++    uint32_t tab[64];
++    j.tab = (uint8_t *)tab;
++    blit4kRows(j);
+ }
+ 
+ void gfx_blit4k(const uint8_t *src, int x, int y, int wWords, int h, uint8_t flags,
+@@ -134,14 +198,6 @@ void gfx_blit4k(const uint8_t *src, int x, int y, int wWords, int h, uint8_t fla
+     if (j.ob > nOut) j.ob = nOut;
+     if (j.oa >= j.ob) return;
+ 
+-    j.flip = flags & GFX_B4_FLIPH;
+-    j.rm = (flags & GFX_B4_REMAP) && remap;
+-    if (j.rm) {
+-        for (uint32_t i = 0; i < 15; i++) j.remap[i] = remap[i] & 15;
+-        j.remap[15] = 15;
+-    }
+-    j.solid = flags & GFX_B4_SOLID;
+-    j.ink = (uint32_t)(flags >> 4) * 0x11111111u;
+     /* Bayer thresholds packed a row per 16 bits, nibble i = column i; the
+      * framebuffer words start on multiples of 8, so a row's mask is the
+      * same four columns twice. */
+@@ -159,5 +215,17 @@ void gfx_blit4k(const uint8_t *src, int x, int y, int wWords, int h, uint8_t fla
+     j.fb = (uint32_t *)gfx_fb + (y + r0) * (GFX_FB_STRIDE / 4) + xw;
+     j.rows = y1 - y - r0;
+     j.y = y + r0;
+-    blit4kRows(j);
++    uint32_t mode = flags & GFX_B4_FLIPH;
++    j.mode = mode;
++    bool rm = (flags & GFX_B4_REMAP) && remap;
++    if (!rm && !(flags & GFX_B4_SOLID)) {
++        blit4kRows(j);
++        return;
++    }
++    static const uint8_t ID[15] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
++    j.remap = rm ? remap : ID;
++    j.keep = flags & GFX_B4_SOLID ? 0 : 15;
++    j.ink = flags & GFX_B4_SOLID ? flags >> 4 : 0;
++    j.mode = mode | B4_MAP;
++    blit4kMapped(j);
+ }
+-- 
+2.53.0.windows.1
+

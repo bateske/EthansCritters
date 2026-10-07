@@ -1,0 +1,47 @@
+# The world (M3): A on the title starts the walk at the hut; then a warp
+# (W x y, the walker's feet in world px) into each region, a few steps and
+# a picture. The marker stops at solid ground and deep water and wades
+# slowly in the shallows.
+wait 30
+tap A
+wait 4
+snap landing            # at the hut's door
+hold UP
+wait 30                 # into the hut's face: blocked
+release
+snap landing_blocked
+hold RIGHT
+wait 50
+release
+snap landing_east       # past the raccoon den's bank
+say W 196 304           # Reed Shallows: the turtle's sandbar
+wait 2
+snap shallows
+hold LEFT
+wait 60                 # off the sand, wading
+release
+snap shallows_wade
+say W 432 150           # Willow Hollow: the chameleons' clearing
+wait 2
+snap hollow
+hold UP+RIGHT
+wait 40
+release
+snap hollow_ne
+say W 520 400           # Beaver Dam: the west bank
+wait 2
+snap dam
+hold DOWN+RIGHT
+wait 60                 # into the pond until the deep water stops it
+release
+snap dam_deep
+say W 776 344           # under the bramble gate into The Rot
+wait 2
+snap gate
+hold UP
+wait 50
+release
+snap rot
+say W 888 660           # the second raccoon den, south-east
+wait 2
+snap den_se

@@ -1,0 +1,54 @@
+# The vertical slice (M5): the turtle clutch in Reed Shallows. W puts the
+# squire on the sandbar east of the clutch; the clutch keeps up to 3
+# turtles alive while he is within 160 px, and they sleep beside it. He
+# walks at them: within 40 px they wake, yawning (the warning, 600 ms,
+# still drowsy: a hit now does double damage). He strikes two at once
+# (-2 each): down to HP 2 they hide in their shells. His next blow only
+# rings off a shell (tink, he is pushed back). The third goes round the
+# clutch and bites him; the shelled ones come out (the shell row
+# backwards); he kills one with two quick blows: a red flash, then the
+# shell fades out. A prints the actors at each beat.
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/turtle_fight.txt out/turtle_fight
+wait 30
+say W 204 312
+step 270
+snap sleeping           # three turtles asleep by the clutch
+say A
+hold LEFT
+step 14
+snap yawn               # within 40 px: they wake, yawning
+step 7
+tap A 1
+step 10
+snap asleep_hit         # yawning, still drowsy: double damage
+say A
+step 24
+snap hiding             # down to HP 2: into their shells
+hold LEFT
+step 4
+release
+tap A 1
+step 11
+snap tink               # steel on a shell: tink, and he is pushed back
+step 95
+say A
+snap bite_tell          # the third came round the clutch: the snap heard, the jaws gaping (the tell)
+step 10
+snap bite               # f2-f3 bite: two half hearts (the game stops 3 ticks)
+say A
+step 29
+snap unhide             # the shelled ones come out (the shell row backwards) and come on
+tap A 1                 # he lays into them: two blows inside 1.5 s ...
+step 11
+snap blow_1
+say A
+step 12
+tap A 1
+step 11
+step 3
+snap kill               # ... kill the one at HP 2: a red flash on its shell (the other, hit twice, hides)
+say A
+step 24
+snap fade               # the shell fades out (and another turtle comes out to sleep by the clutch)
+step 30
+say A

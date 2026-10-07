@@ -1,0 +1,160 @@
+From b41d0297426d87aa5739fe7223de10637c4576ff Mon Sep 17 00:00:00 2001
+From: bateske <kevin@bateske.com>
+Date: Sat, 3 Oct 2026 09:19:53 -0700
+Subject: [PATCH 1/3] CHSd P2: sd::setStreamTimeout(), sd::recover(), isSdhc(),
+ readReg()
+
+A game that streams every frame cannot afford stream()'s 1 s token wait,
+nor a full init() at 187.5 kHz after one failed stream. stream() now waits
+through its own swait(), whose timeout setStreamTimeout() sets (default
+1 s, as before), and recover() restarts the card after a failed stream
+without init(): CMD12 always ends a stream, so no stale block can follow
+(unlike read()). isSdhc() and readReg() (CSD/CID) are for benchmark
+reports. read(), wait() and init() are untouched: CHWords, CHWordWheel and
+CHCrossword build to identical images; CHStlView's changes (stream()).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../CHGame/libraries/CHSd/src/SdSpi.cpp       | 67 ++++++++++++++++++-
+ .../arduino/CHGame/libraries/CHSd/src/SdSpi.h | 26 +++++++
+ 2 files changed, 91 insertions(+), 2 deletions(-)
+
+diff --git a/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.cpp b/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.cpp
+index 0a65f34..0f2c823 100644
+--- a/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.cpp
++++ b/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.cpp
+@@ -162,6 +162,23 @@ static const uint32_t DMA_EN = 1u << 0, DMA_M2P = 1u << 4, DMA_MINC = 1u << 7;
+ static const uint32_t DMA_CH23 = 0xFFu << 4, DMA_TC2 = 1u << 5, DMA_TE2 = 1u << 7;
+ static const uint8_t FILL = 0xFF;
+ 
++// stream()'s waits have a timeout of their own (setStreamTimeout), so that
++// read() and wait() above stay as they were in the games' images. A game
++// that streams every frame would rather lose one frame's blocks than stall
++// a second on a block the card has never been asked for since power-up
++// (HypeRunner measured 300-770 ms).
++static uint32_t streamUs = WAIT_US;
++
++void setStreamTimeout(uint32_t us) { streamUs = us; }
++
++// wait(), against streamUs.
++static uint8_t swait(bool tok) {
++    uint32_t t0 = micros(), us = streamUs;
++    uint8_t b;
++    do b = xfer(0xFF); while ((b == 0xFF) == tok && micros() - t0 <= us);
++    return b;
++}
++
+ static void dmaStart(uint8_t *dst) {
+     DMA1_Channel2->CFGR = 0;
+     DMA1_Channel3->CFGR = 0;
+@@ -194,11 +211,11 @@ bool stream(uint32_t lba, uint32_t n, uint8_t *buf0, uint8_t *buf1, BlockFn fn,
+     if (!n) return true;
+     claim();
+     spiSet(SPI_MASTER | SPE);                               // BR 0: 24 MHz
+-    bool ok = wait(false) == 0xFF && cmd(18, hc ? lba : lba << 9) == 0;
++    bool ok = swait(false) == 0xFF && cmd(18, hc ? lba : lba << 9) == 0;
+     const uint8_t *pending = nullptr;
+     for (uint32_t k = 0; ok && k < n; k++) {
+         uint8_t *cur = (k & 1) ? buf1 : buf0;
+-        if (wait(true) != 0xFE) { ok = false; break; }
++        if (swait(true) != 0xFE) { ok = false; break; }
+         dmaStart(cur);
+         if (pending) fn(pending, ctx);                      // while the block arrives
+         if (!dmaWait()) { ok = false; break; }
+@@ -223,5 +240,51 @@ bool stream(uint32_t lba, uint32_t n, uint8_t *buf0, uint8_t *buf1, BlockFn fn,
+     return ok && !(r & 0x80);
+ }
+ 
++// ---- After a failed stream(): recover() --------------------------------
++// stream() always ends with CMD12, and in a multi-block read the card stops
++// sending at the end bit of CMD12 (the spec's SPI-mode data read, 7.2.3),
++// so unlike after a late single-block token no block can still be on its
++// way: the card is back in the transfer state, or busy getting there
++// (CMD12's R1b). What is left is that busy time, and a status that may be
++// sticky. So: wait out busy, CMD12 again (in case the first went unheard;
++// if the card is not sending, it answers "illegal command" and nothing
++// happens), wait out its busy, then CMD13 (SEND_STATUS, R2). Its R1 says
++// whether the card is still initialised: idle (bit 0, power was lost) or no
++// answer (bit 7, no card) means init(). Reading R2 also clears the error
++// bits a read-ahead past the end of the card can leave set. All at the run
++// clock (12 MHz) and under streamUs, so a card still busy with a slow block
++// costs one timeout and a false (try again next frame) rather than a stall.
++static bool rcv() {
++    if (swait(false) != 0xFF) return false;                 // still busy
++    cmd(12, 0);                                             // (any answer, or none)
++    if (swait(false) != 0xFF) return false;
++    uint8_t r = cmd(13, 0);
++    xfer(0xFF);                                             // R2's second byte, unused
++    return !(r & 0x81);
++}
++
++bool recover() {
++    claim();
++    bool ok = rcv();
++    release();
++    return ok;
++}
++
++bool isSdhc() { return hc; }
++
++// CMD9 (CSD) or CMD10 (CID): a 16-byte data block after a start token, like
++// read()'s, then the CRC16.
++bool readReg(uint8_t c, uint8_t *dst) {
++    claim();
++    bool ok = swait(false) == 0xFF && cmd(c, 0) == 0 && swait(true) == 0xFE;
++    if (ok) {
++        for (uint32_t i = 0; i < 16; i++) dst[i] = xfer(0xFF);
++        xfer(0xFF);
++        xfer(0xFF);
++    }
++    release();
++    return ok;
++}
++
+ }  // namespace sd
+ #endif
+diff --git a/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.h b/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.h
+index c748644..fa3057f 100644
+--- a/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.h
++++ b/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.h
+@@ -10,6 +10,7 @@
+ //
+ // After a read fails, call init() before reading again: a block whose token
+ // came late may still be on its way, and init()'s CMD0 is what clears it.
++// (After a failed stream() there is a cheaper way: recover(), below.)
+ #pragma once
+ #include <stdint.h>
+ 
+@@ -32,4 +33,29 @@ bool read(uint32_t lba, uint8_t *dst);      // one block; false: the card did no
+ typedef void (*BlockFn)(const uint8_t *block, void *ctx);
+ bool stream(uint32_t lba, uint32_t n, uint8_t *buf0, uint8_t *buf1, BlockFn fn, void *ctx);
+ 
++// How long stream() waits for the card: for it to be ready before the
++// command, and for each block's start token. Default 1 s, as read() (some
++// cards take 300-770 ms over a block's first read after power-up); a
++// sketch that streams every frame can set a few ms and treat a timeout as
++// "not this frame". Applies to recover() and readReg() too.
++void setStreamTimeout(uint32_t us);
++
++// After a failed stream(), instead of init(): stream() always ends with
++// CMD12, after which the card sends nothing more (a multi-block read stops
++// at CMD12's end bit), so no stale block can be taken for an answer and the
++// card needs no reset. recover() waits out the card's busy time, sends CMD12
++// once more and asks the card's status (CMD13). True: stream() again. False:
++// the card is still busy (within the stream timeout: try again next frame),
++// has lost power (idle) or is gone; after a few falses, init(). Costs a few
++// tens of us, against init()'s identification at 187.5 kHz (milliseconds,
++// and up to a second for ACMD41).
++bool recover();
++
++// Card information, after init(): block addressing (SDHC/SDXC) or byte
++// addressing (SDSC), and the 16-byte CSD (CMD9) or CID (CMD10) register:
++// readReg(10, buf) gives the maker's id (byte 0), the product name (bytes
++// 3-7), the serial (bytes 9-12) and the date. For a benchmark's report.
++bool isSdhc();
++bool readReg(uint8_t cmd, uint8_t *dst16);
++
+ }  // namespace sd
+-- 
+2.53.0.windows.1
+

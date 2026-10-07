@@ -1,0 +1,162 @@
+# What a crowd of the new cast costs (M6b), in the dam pond's shallows by
+# the west lodge: "six" the lodge's own two beavers and one more (diving,
+# surfacing, biting) and three chameleons, put there with C (fading,
+# creeping as shimmers, lashing); "eight" two more beavers; "ten" two more
+# chameleons (the nests stop at nests::CROWD = 8 alive: these are put with C).
+# The squire guards and turns (I1 keeps him on his feet; sparks off his
+# guard). `step` draws a frame per logic tick, as the board does while
+# frames fit. For the board's card timing:
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/crowd_perf.txt out/crowd_perf
+# Z: PLAY (frames, at 30 fps, over the 7.9 ms budget, mode switches, the
+# mode, average and worst us after gfx_wait()) | SPOOL | OCCL | DRAW est
+# (slice_perf.txt has the fields).
+wait 30
+say W 566 416
+say I1
+say C 3 540 404
+say C 3 592 410
+say C 3 556 380
+say C 2 610 430
+step 200
+say A
+say Z0
+perf start
+hold B
+step 30
+release
+hold LEFT
+step 6
+release
+hold B
+step 30
+release
+hold RIGHT
+step 6
+release
+step 20
+hold B
+step 30
+release
+hold LEFT
+step 6
+release
+hold B
+step 30
+release
+hold RIGHT
+step 6
+release
+step 20
+hold B
+step 30
+release
+hold LEFT
+step 6
+release
+hold B
+step 30
+release
+hold RIGHT
+step 6
+release
+step 20
+perf six
+say Z
+say A
+snap six
+say C 2 600 440
+say C 2 590 470
+step 60
+say Z0
+perf start
+hold B
+step 30
+release
+hold LEFT
+step 6
+release
+hold B
+step 30
+release
+hold RIGHT
+step 6
+release
+step 20
+hold B
+step 30
+release
+hold LEFT
+step 6
+release
+hold B
+step 30
+release
+hold RIGHT
+step 6
+release
+step 20
+hold B
+step 30
+release
+hold LEFT
+step 6
+release
+hold B
+step 30
+release
+hold RIGHT
+step 6
+release
+step 20
+perf eight
+say Z
+say A
+snap eight
+say C 3 530 420
+say C 3 600 396
+step 60
+say Z0
+perf start
+hold B
+step 30
+release
+hold LEFT
+step 6
+release
+hold B
+step 30
+release
+hold RIGHT
+step 6
+release
+step 20
+hold B
+step 30
+release
+hold LEFT
+step 6
+release
+hold B
+step 30
+release
+hold RIGHT
+step 6
+release
+step 20
+hold B
+step 30
+release
+hold LEFT
+step 6
+release
+hold B
+step 30
+release
+hold RIGHT
+step 6
+release
+step 20
+perf ten
+say Z
+say A
+snap ten

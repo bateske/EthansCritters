@@ -1,0 +1,66 @@
+# The M5a pieces in the sprite lab (B on the title): the nests (intact,
+# battered, wrecked are frames 0-2: the parade plays them in turn), the
+# mushroom pickups and the spawn puff from the bank, then each effect of
+# src/fx/Fx.h (F<n>), the squire's spark on a thrust, the hit flash through
+# REMAP_RED, and fx::scroll keeping the effects on the world (M<dx> <dy>).
+# perf: rnd = the average from gfx_wait() to the flush, max = the worst, us.
+# For the board's card timing:
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/lab_juice.txt out/lab_juice
+wait 30
+tap B
+wait 10
+say C32                 # nests: raccoon, turtle, beaver, chameleon
+perf start              # (the counters start here)
+step 8
+snap nests_a
+step 10
+snap nests_b
+step 10
+snap nests_c
+say C36                 # mushrooms red and white, the puff, the beaver's stick (spinning)
+step 6
+snap pickups_a
+step 6
+snap pickups_b
+step 8
+snap pickups_c
+step 10
+snap pickups_d
+say F0                  # a spark
+step 2
+snap fx_spark_2
+step 6
+snap fx_spark_8
+say F1                  # dust
+step 4
+snap fx_dust_4
+step 10
+snap fx_dust_14
+say F2                  # mud
+step 6
+snap fx_mud_6
+step 10
+snap fx_mud_16
+say F3                  # water
+step 8
+snap fx_water_8
+say F4                  # wood chips
+step 6
+snap fx_chips_6
+step 12
+snap fx_chips_18
+say F5                  # a number
+step 10
+snap fx_number_10
+say M20 0               # the camera moves 20 px right: the number moves 20 px left
+step 1
+snap fx_number_scrolled
+step 20
+tap A 1                 # the squire's thrust: a spark where the tip strikes
+step 13
+snap thrust_spark
+step 20
+say H2b                 # hurt: REMAP_RED (the same table, now the palette's)
+step 1
+snap hurt_red
+perf juice

@@ -1,0 +1,4 @@
+# B4 long: the plan's 20,000-frame soak (about 4 minutes on the board).
+bench Z4 20000
+snap soak
+summary

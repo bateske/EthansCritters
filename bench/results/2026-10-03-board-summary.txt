@@ -1,0 +1,38 @@
+B1 boot : card=ok init=4120 us, mount=3724 us, find+runs=25543 us, header=2192 us, runs=1, blocks=65536
+B1 again: card=ok init=4118 us, mount=3421 us, find+runs=25562 us, header=2196 us, runs=1, blocks=65536
+   card: SDHC/SDXC, maker 65, product SD16G, 14916 MB
+B3 boot: 32 MB, warm 649 us; first reads p50 899 p95 1399 max 1425 us, 0 over 10 ms, fail 0, bad 0
+   us by MB: 649 1348 920 854 905 1397 925 899 901 1425 899 899 925 1399 900 925 900 1398 869 875 869 1367 869 868 869 869 869 868 869 869 854 854
+B3 again: 32 MB, warm 650 us; first reads p50 899 p95 1399 max 1425 us, 0 over 10 ms, fail 0, bad 0
+   us by MB: 650 1354 920 857 905 1398 925 899 900 1425 904 900 930 1399 900 925 898 1399 870 875 869 1367 870 870 869 867 869 868 869 863 854 854
+B2 stream (us)     random offsets               warm 128 KB window
+     n      p50     p95     max  err      p50     p95     max  err
+     1     1159    1388    1419    0      864     895    1365    0
+     2     1379    1610    1613    0     1087    1117    1118    0
+     4     1537    2031    2057    0     1527    1561    1563    0
+     8     2666    2939    2944    0     2417    2449    2450    0
+    17     4417    4916    4964    0     4406    4443    4447    0
+    32     8024    8251    8270    0     7727    7771    7775    0
+   fit rnd : 832 us per command + 221.7 us per block
+   fit warm: 644 us per command + 221.3 us per block
+   reads split across the file's runs: 0
+B4 soak: 2000 frames, 34000 blocks, bad 0, failed 0 (recovered 0, init 0)
+   17 blocks: avg 4570 us, max 5524 us, 2000 over 4000 us (timeout 1000000 us)
+B5 drawing (us per call; *_screen per screen)
+   blit32_even          226.1
+   blit32_odd           442.2
+   sprite4_24x21        173.9
+   sprite4_remap        175.5
+   sprite4_fliph        173.1
+   remaprect_24x8        50.5
+   copy16_screen        229.4
+   column_p0             26.1
+   column_p3             51.5
+   world16_screen       420.1
+   world17_screen       844.1
+   flush_start          102.0
+   flush_wire          8412.0
+   column copy check: ok
+B8 never-read blocks, 5000 us timeout: 0/32 timed out, 0 lost, tries max 1, to data p50 1150 max 1683 us
+   forced timeouts: 20, recovered without init 20, re-read ok 20
+   recover() 66 us (max 67, idle 63), init() 4118 us (max 4119)

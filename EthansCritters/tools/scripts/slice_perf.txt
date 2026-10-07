@@ -1,0 +1,208 @@
+# What a busy fight costs (M5), by the raccoon den. "eight": five critters
+# put there with C (three turtles, two raccoons) and the den's own three
+# raccoons round the squire while he guards and walks (sparks off his
+# guard, dust); "twelve": the pool full (four more put there, and one
+# again every 2 s as he kills them), thrusting too (numbers, more
+# sparks); "standing": the same crowd, the squire still. I1 keeps him on
+# his feet. `step` draws a frame per logic tick, as the board does while
+# frames fit. For the board's card timing:
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/slice_perf.txt out/slice_perf
+# Z: PLAY (frames, at 30 fps, over the 7.9 ms budget, mode switches, the
+# mode, average and worst us after gfx_wait(): the card's time plus the
+# drawing, which the simulator models from the board's numbers, see Play.cpp)
+# | SPOOL (the frame cache: fetches, commands, blocks, misses, frames
+# loaded, deferred to a later frame, misses at draw time, its worst fetch)
+# | DRAW est (the drawing's share: average, worst).
+wait 30
+say W 262 636
+say I1
+say C 1 222 640
+say C 1 300 644
+say C 1 250 666
+say C 0 238 622
+say C 0 294 618
+step 250
+say A
+say Z0
+perf start
+hold B
+step 30
+release
+hold LEFT
+step 8
+release
+hold B
+step 24
+release
+hold B
+step 30
+release
+hold RIGHT
+step 8
+release
+step 10
+hold B
+step 30
+release
+hold LEFT
+step 8
+release
+hold B
+step 24
+release
+hold B
+step 30
+release
+hold RIGHT
+step 8
+release
+step 10
+hold B
+step 30
+release
+hold LEFT
+step 8
+release
+hold B
+step 24
+release
+hold B
+step 30
+release
+hold RIGHT
+step 8
+release
+step 10
+hold B
+step 30
+release
+hold LEFT
+step 8
+release
+hold B
+step 24
+release
+hold B
+step 30
+release
+hold RIGHT
+step 8
+release
+step 10
+hold B
+step 30
+release
+hold LEFT
+step 8
+release
+hold B
+step 24
+release
+hold B
+step 30
+release
+hold RIGHT
+step 8
+release
+step 10
+hold B
+step 30
+release
+hold LEFT
+step 8
+release
+hold B
+step 24
+release
+hold B
+step 30
+release
+hold RIGHT
+step 8
+release
+step 10
+perf eight
+say Z
+say A
+snap eight
+say C 1 270 606
+say C 1 230 650
+say C 0 300 630
+say C 0 226 628
+step 30
+say Z0
+perf start
+say C 0 238 622
+hold B
+step 30
+release
+hold LEFT
+step 8
+release
+tap A 1
+step 22
+hold B
+step 30
+release
+hold RIGHT
+step 8
+release
+step 10
+say C 1 300 644
+hold B
+step 30
+release
+hold LEFT
+step 8
+release
+tap A 1
+step 22
+hold B
+step 30
+release
+hold RIGHT
+step 8
+release
+step 10
+say C 0 294 618
+hold B
+step 30
+release
+hold LEFT
+step 8
+release
+tap A 1
+step 22
+hold B
+step 30
+release
+hold RIGHT
+step 8
+release
+step 10
+say C 1 222 640
+hold B
+step 30
+release
+hold LEFT
+step 8
+release
+tap A 1
+step 22
+hold B
+step 30
+release
+hold RIGHT
+step 8
+release
+step 10
+perf twelve
+say Z
+say A
+snap twelve
+say Z0
+perf start
+step 120
+perf standing
+say Z
+snap standing

@@ -1,0 +1,6 @@
+# B8: short timeouts on never-read blocks, recover(), init(). Run it first
+# after boot (B3 reads only the start of each MB; B8 reads the middles).
+# Another timeout: bench Z8 <us>.
+bench Z8
+snap recovery
+summary

@@ -1,0 +1,10 @@
+# The title: a full-screen picture streamed from CRITTERS.DAT into the
+# framebuffer every frame (Path F), PRESS A blinking over it (since M7b a
+# 16-frame loop: title_loop.txt).
+wait 30
+snap title
+perf boot           # (the counters start here: the first frame opened the card)
+wait 120
+perf title          # every frame streams the 16 blocks again
+wait 15
+snap title_blink    # PRESS A off

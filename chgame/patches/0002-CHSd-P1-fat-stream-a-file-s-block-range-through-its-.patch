@@ -1,0 +1,274 @@
+From 9c2d4207c06853d616d592f45f5d10bfa167dbcc Mon Sep 17 00:00:00 2001
+From: bateske <kevin@bateske.com>
+Date: Sat, 3 Oct 2026 09:19:53 -0700
+Subject: [PATCH 2/3] CHSd P1: fat::stream(), a file's block range through its
+ runs
+
+One sd::stream() per run the range touches (lifted from CHStlView's
+card::stream()), the range checked against the file before anything is
+read. Its own file, FatStream.cpp, so no image that does not call it
+grows. Host tests stream every file of every test image: whole files,
+every run boundary, random ranges, past the end, a card failing part way.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../arduino/CHGame/libraries/CHSd/src/Fat.h   | 17 ++++
+ .../CHGame/libraries/CHSd/src/FatStream.cpp   | 32 +++++++
+ .../CHGame/libraries/CHSd/tests/run_tests.py  |  8 +-
+ .../CHGame/libraries/CHSd/tests/test_fat.cpp  | 96 ++++++++++++++++++-
+ 4 files changed, 145 insertions(+), 8 deletions(-)
+ create mode 100644 chgame/platform/board/arduino/CHGame/libraries/CHSd/src/FatStream.cpp
+
+diff --git a/platform/board/arduino/CHGame/libraries/CHSd/src/Fat.h b/platform/board/arduino/CHGame/libraries/CHSd/src/Fat.h
+index 4f2766a..8a8c92d 100644
+--- a/platform/board/arduino/CHGame/libraries/CHSd/src/Fat.h
++++ b/platform/board/arduino/CHGame/libraries/CHSd/src/Fat.h
+@@ -16,6 +16,7 @@
+ // folder a file name.
+ #pragma once
+ #include <stdint.h>
++#include "SdSpi.h"
+ 
+ namespace fat {
+ 
+@@ -77,4 +78,20 @@ uint8_t open(const char *name, Run *out, uint8_t maxRuns, uint8_t *buf);
+ // False: past the end, or the card did not deliver it.
+ bool read(const Run *run, uint32_t nRuns, uint32_t k, uint8_t *dst);
+ 
++// Blocks [k, k + n) of a file through its runs, by sd::stream(): one
++// multi-block read per run the range touches (so a range across a run
++// boundary costs a second command), each block handed to fn(block, ctx)
++// once, in order, while the next arrives by DMA into the other buffer.
++// buf0/buf1 are 512 B each, 4-byte aligned (gfx_chunkScratch() and the
++// half after it, between gfx_wait() and the next flush); a block is only
++// valid during its fn call. False: the range runs past the end (refused
++// before anything is read), or the card failed part way (fn has seen a
++// first part of the range, not always every block that arrived: fn gets a
++// block once the next one's token is in, so a timeout loses the block
++// before it too; see sd::stream() for what to do next).
++// (In its own file, FatStream.cpp, so it is in no image that does not
++// call it.)
++bool stream(const Run *run, uint8_t nRuns, uint32_t k, uint32_t n, uint8_t *buf0, uint8_t *buf1,
++            sd::BlockFn fn, void *ctx);
++
+ }  // namespace fat
+diff --git a/platform/board/arduino/CHGame/libraries/CHSd/src/FatStream.cpp b/platform/board/arduino/CHGame/libraries/CHSd/src/FatStream.cpp
+new file mode 100644
+index 0000000..251f299
+--- /dev/null
++++ b/platform/board/arduino/CHGame/libraries/CHSd/src/FatStream.cpp
+@@ -0,0 +1,32 @@
++// FatStream.cpp - fat::stream(), see Fat.h: a file's blocks through
++// sd::stream(), split where the file's runs split. Lifted from CHStlView's
++// card::stream(), with the range checked before anything is read. A file
++// of its own so that Fat.cpp, and with it every image that only reads
++// blocks one at a time, stays byte for byte what it was. Like Fat.cpp it
++// runs on the PC too: the simulator's card and the host tests supply
++// sd::stream().
++#pragma GCC optimize("Os", "no-ipa-sra")
++#include "Fat.h"
++#include "SdSpi.h"
++
++namespace fat {
++
++bool stream(const Run *r, uint8_t nRuns, uint32_t k, uint32_t n, uint8_t *buf0, uint8_t *buf1,
++            sd::BlockFn fn, void *ctx) {
++    const Run *end = r + nRuns;
++    uint32_t len = 0;
++    for (const Run *p = r; p < end; p++) len += p->blocks;
++    if (k > len || n > len - k) return false;
++    // In range, so the loop ends inside the runs.
++    for (; n; r++) {
++        if (k >= r->blocks) { k -= r->blocks; continue; }
++        uint32_t take = r->blocks - k;
++        if (take > n) take = n;
++        if (!sd::stream(r->lba + k, take, buf0, buf1, fn, ctx)) return false;
++        n -= take;
++        k = 0;
++    }
++    return true;
++}
++
++}  // namespace fat
+diff --git a/platform/board/arduino/CHGame/libraries/CHSd/tests/run_tests.py b/platform/board/arduino/CHGame/libraries/CHSd/tests/run_tests.py
+index cec4158..3404039 100644
+--- a/platform/board/arduino/CHGame/libraries/CHSd/tests/run_tests.py
++++ b/platform/board/arduino/CHGame/libraries/CHSd/tests/run_tests.py
+@@ -1,5 +1,6 @@
+-"""Build and run CHSd's host tests: src/Fat.cpp against FAT images made with
+-tools/fatimg.py (whose layout is the ground truth), and host/VCard.h.
++"""Build and run CHSd's host tests: src/Fat.cpp and src/FatStream.cpp against
++FAT images made with tools/fatimg.py (whose layout is the ground truth), and
++host/VCard.h.
+ 
+     python tests/run_tests.py [--quick]
+ 
+@@ -95,7 +96,8 @@ def main():
+     exe = BUILD / "test_fat.exe"
+     cmd = find_cxx() + ["-std=gnu++17", "-O2", "-Wall", "-Wextra", "-Wno-unknown-pragmas",
+                         "-fsanitize=undefined", "-fno-sanitize-recover=undefined", "-DCHTEST",
+-                        str(HERE / "test_fat.cpp"), str(ROOT / "src" / "Fat.cpp"), "-o", str(exe)]
++                        str(HERE / "test_fat.cpp"), str(ROOT / "src" / "Fat.cpp"), str(ROOT / "src" / "FatStream.cpp"),
++                        "-o", str(exe)]
+     r = subprocess.run(cmd, capture_output=True, text=True)
+     if r.returncode:
+         sys.stderr.write(r.stdout + r.stderr)
+diff --git a/platform/board/arduino/CHGame/libraries/CHSd/tests/test_fat.cpp b/platform/board/arduino/CHGame/libraries/CHSd/tests/test_fat.cpp
+index 42ea7db..34c5e76 100644
+--- a/platform/board/arduino/CHGame/libraries/CHSd/tests/test_fat.cpp
++++ b/platform/board/arduino/CHGame/libraries/CHSd/tests/test_fat.cpp
+@@ -1,6 +1,6 @@
+-// Host tests of CHSd's FAT reader (src/Fat.cpp) against card images made by
+-// run_tests.py with tools/fatimg.py, whose layout is the ground truth, and
+-// of the simulator's pretend card (host/VCard.h).
++// Host tests of CHSd's FAT reader (src/Fat.cpp, src/FatStream.cpp) against
++// card images made by run_tests.py with tools/fatimg.py, whose layout is the
++// ground truth, and of the simulator's pretend card (host/VCard.h).
+ //
+ //   test_fat IMAGE SPEC     SPEC: what is on the image (run_tests.py writes it)
+ //   test_fat --none         no card in the slot
+@@ -34,6 +34,8 @@ static std::vector<uint8_t> image, vfile;
+ static vcard::Card vc;
+ static bool useVc;
+ static long reads, failAfter = -1;      // failAfter >= 0: that many more reads work
++static long streamCalls, streamFailAfter = -1;   // sd::stream() calls; as failAfter, in blocks
++static long crossings;                  // fat::stream() ranges checked that span runs
+ 
+ namespace sd {
+ bool init() { return (useVc || !image.empty()) && failAfter != 0; }
+@@ -54,9 +56,24 @@ bool read(uint32_t lba, uint8_t *dst) {
+     memcpy(dst, image.data() + (size_t)lba * 512, 512);
+     return true;
+ }
++// sd::stream() over the same blocks, one at a time (on the board fn gets
++// block k while k + 1 arrives; the order is the same). streamFailAfter >= 0:
++// that many more blocks arrive, then the stream fails.
++bool stream(uint32_t lba, uint32_t n, uint8_t *buf0, uint8_t *buf1, BlockFn fn, void *ctx) {
++    streamCalls++;
++    for (uint32_t k = 0; k < n; k++) {
++        if (streamFailAfter == 0) return false;
++        if (streamFailAfter > 0) streamFailAfter--;
++        uint8_t *b = (k & 1) ? buf1 : buf0;
++        if (!read(lba + k, b)) return false;
++        fn(b, ctx);
++    }
++    return true;
++}
+ }  // namespace sd
+ 
+ alignas(4) static uint8_t buf[512];
++alignas(4) static uint8_t sbuf[2][512];
+ 
+ // The contents run_tests.py gives a file.
+ static uint8_t byteAt(uint32_t i, uint32_t seed) { return (uint8_t)(i * 7 + seed * 13 + (i >> 9)); }
+@@ -82,6 +99,73 @@ static void readAll(const fat::Run *r, uint32_t n, uint32_t size, uint32_t seed)
+     CHECK(!fat::read(r, n, blocks, buf));
+ }
+ 
++// fat::stream() of blocks [k, k + n): every block once, in order, with the
++// file's bytes, and one sd::stream() per run the range touches.
++struct Seq { uint32_t next, size, seed, bad, calls; };
++static void seqBlock(const uint8_t *b, void *ctx) {
++    Seq &q = *(Seq *)ctx;
++    for (uint32_t j = 0; j < 512 && q.next * 512 + j < q.size; j++) q.bad += b[j] != byteAt(q.next * 512 + j, q.seed);
++    q.next++;
++    q.calls++;
++}
++
++static void streamRange(const fat::Run *r, uint32_t nr, uint32_t size, uint32_t seed, uint32_t k, uint32_t n) {
++    uint32_t pieces = 0, at = 0;
++    for (uint32_t i = 0; i < nr; i++, at += r[i - 1].blocks)
++        if (n && k < at + r[i].blocks && k + n > at) pieces++;
++    Seq q = {k, size, seed, 0, 0};
++    streamCalls = 0;
++    CHECK(fat::stream(r, (uint8_t)nr, k, n, sbuf[0], sbuf[1], seqBlock, &q));
++    CHECK_EQ(q.calls, n);
++    CHECK_EQ(q.bad, 0);
++    CHECK_EQ(streamCalls, pieces);
++    crossings += pieces > 1;
++}
++
++static void streamAll(const fat::Run *r, uint32_t nr, uint32_t size, uint32_t seed) {
++    uint32_t blocks = (size + 511) / 512;
++    streamRange(r, nr, size, seed, 0, blocks);                  // the whole file
++    streamRange(r, nr, size, seed, 0, 0);                       // nothing: true, no command
++    if (blocks) streamRange(r, nr, size, seed, blocks - 1, 1);  // the last block
++    // Every run boundary, crossed by 1..3 blocks each side, and a range
++    // from the middle of one run to the middle of the one after next.
++    uint32_t at = 0;
++    for (uint32_t i = 0; i + 1 < nr; i++) {
++        at += r[i].blocks;
++        for (uint32_t a = 1; a <= 3 && a <= at; a++)
++            for (uint32_t b = 1; b <= 3 && at + b <= blocks; b++) streamRange(r, nr, size, seed, at - a, a + b);
++        if (i + 2 < nr) streamRange(r, nr, size, seed, at - r[i].blocks / 2, r[i].blocks / 2 + r[i + 1].blocks + 1);
++    }
++    // Pseudo-random ranges.
++    uint32_t x = 12345 + size;
++    for (uint32_t t = 0; blocks && t < 40; t++) {
++        x = x * 1103515245u + 12345u;
++        uint32_t k = (x >> 8) % blocks;
++        x = x * 1103515245u + 12345u;
++        uint32_t n = 1 + (x >> 8) % (blocks - k < 40 ? blocks - k : 40);
++        streamRange(r, nr, size, seed, k, n);
++    }
++    // Past the end: refused before anything is read.
++    Seq q = {0, size, seed, 0, 0};
++    streamCalls = 0;
++    CHECK(!fat::stream(r, (uint8_t)nr, blocks, 1, sbuf[0], sbuf[1], seqBlock, &q));
++    if (blocks) CHECK(!fat::stream(r, (uint8_t)nr, 1, blocks, sbuf[0], sbuf[1], seqBlock, &q));
++    CHECK(!fat::stream(r, (uint8_t)nr, 1, 0xFFFFFFFFu, sbuf[0], sbuf[1], seqBlock, &q));
++    CHECK(!fat::stream(r, (uint8_t)nr, blocks + 1, 0, sbuf[0], sbuf[1], seqBlock, &q));
++    CHECK_EQ(q.calls, 0);
++    CHECK_EQ(streamCalls, 0);
++    // The card failing part way: false, and fn has seen exactly the blocks
++    // before the failure, all good.
++    for (uint32_t f = 0; f < blocks && f < 12; f++) {
++        Seq w = {0, size, seed, 0, 0};
++        streamFailAfter = f;
++        CHECK(!fat::stream(r, (uint8_t)nr, 0, blocks, sbuf[0], sbuf[1], seqBlock, &w));
++        streamFailAfter = -1;
++        CHECK_EQ(w.calls, f);
++        CHECK_EQ(w.bad, 0);
++    }
++}
++
+ static int runImage(const char *imagePath, const char *specPath) {
+     FILE *f = fopen(imagePath, "rb");
+     if (!f) { printf("cannot open %s\n", imagePath); return 2; }
+@@ -167,6 +251,7 @@ static int runImage(const char *imagePath, const char *specPath) {
+         fat::Run r2[16];
+         CHECK_EQ(fat::open(x.name.c_str(), r2, 16, buf), n);
+         if (n > 0) readAll(r2, (uint32_t)n, x.size, x.seed);
++        if (n > 0) streamAll(r2, (uint32_t)n, x.size, x.seed);
+         // '?' stands for any character.
+         std::string wild = x.name;
+         wild[0] = wild[10] = '?';
+@@ -281,7 +366,7 @@ static int runImage(const char *imagePath, const char *specPath) {
+         failAfter = -1;
+     }
+     CHECK_EQ(fat::mount(buf), 0);
+-    printf("%ld checks, %ld failed\n", checks, fails);
++    printf("%ld checks, %ld failed, %ld streams across runs\n", checks, fails, crossings);
+     return fails ? 1 : 0;
+ }
+ 
+@@ -298,6 +383,7 @@ static int runVcard() {
+         uint32_t clusters = (size + 4095) / 4096;
+         CHECK_EQ(n, clusters == 0 ? 0 : clusters == 1 ? 1 : 2);
+         if (n > 0) readAll(r, (uint32_t)n, size, 5);
++        if (n > 0) streamAll(r, (uint32_t)n, size, 5);
+         if (n == 2) CHECK_EQ(fat::open("WORDS   DIC", r, 1, buf), 0);
+         fat::File f;
+         CHECK_EQ(fat::find("CHSD SIM   ", f, buf), fat::E_NOTFOUND);      // the label is not a file
+@@ -308,7 +394,7 @@ static int runVcard() {
+     CHECK_EQ(fat::mount(buf), 0);
+     CHECK_EQ(fat::find("PHRASES BNK", f, buf), 0);
+     CHECK_EQ(f.size, 39424);
+-    printf("%ld checks, %ld failed (vcard)\n", checks, fails);
++    printf("%ld checks, %ld failed (vcard), %ld streams across runs\n", checks, fails, crossings);
+     return fails ? 1 : 0;
+ }
+ 
+-- 
+2.53.0.windows.1
+

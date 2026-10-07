@@ -1,0 +1,64 @@
+# Ethan's Critters: the swamp, 64 x 48 cells of 16 px (the world is 1024 x 768).
+# tools/world/paint.py paints it with tools/world/objects.json (the props,
+# nests, mushrooms, regions, gate and start) and tools/mkcard.py puts it on
+# the card. Lines starting with # are comments; then exactly 48 rows of 64.
+#
+#   .  grass                    s  sand                 d  dirt (trodden earth)
+#   m  mud                      ~  shallow water        w  deep water
+#   r  reeds (shallow water thick with reeds and cattails)
+#   T  forest (willows packed tight; solid)
+#   %  bramble (a thorn thicket; solid)
+#   B  bank (an earth face, the grass mound above it on the row above; solid)
+#   H  the hut (a bank with holes, windows and the door; solid)
+#
+# Grass is painted from the tileset's autotiles on a grid offset by half a
+# cell (each 16 px piece joins four cells), so no 2 x 2 block may have grass
+# on one diagonal only: paint.py fills such a pinch and says where.
+TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+TTTT..........TTT.TTTTTTTT....TTTTTT.TTT%%%TTTTmmm..mmTTTTTTTTTT
+TTT..........TTTTT...TTTTT....TTTTTTT..T%%%mmmmmddd.mmmmmmmTTTTT
+TT...........TTTTT.............TTTTT....%%%mm..dddddmmm~mmmmmmTT
+TT...........TTTTT......................%%mmm...ddmm~~~~~~mmmmTT
+TT............TTT........dddd............%%mm..mmm~~~~~~~~~~mmTT
+TTT.............TTT.....ddddddd..........%%%mmmmm~~~wwwwww~~~mTT
+TTT.............TTT.....ddddddd.....TT...%%%mm.mm~~wwwwwwww~~mTT
+TTT.......~~TTT.TTT.....ddddddd....TTT....%%mm..m~~wwwwwwwww~~mT
+TTT....r.~~~TTT~.........ddddd.....TTT....%%mmm.mm~~wwwwwww~~mTT
+TT...~rrrrr~TTT~sss................TTT...%%%mmmmmm~~~wwwww~~~mTT
+TT...wwwrr~~TTTssssTTT..............TT...%%mmmmmmmm~~~~~~~~~mmTT
+TT..wwwww~~~TT~~sssTTT.........~~~.......%%mmm..mmmmmm~~m~~mmmTT
+TTT~wwwww~~~~~~~wwwTTT...TTT..~www~.....%%%mmm...mmmmmmmm~~dddTT
+TTTrwwwww~~~~~~~wwwTT....TTTT..~~~......%%mmmmm.mmmmmmmm~~dddTTT
+TTTrrwww~~~~~rr~www~~....TTTT...........%%%mdddmmmmmmmmm~~mddTTT
+TTrrr~~~~~s~rrr~~~~~~~...................%%%%mmmmmmmmmmm~~mmTTTT
+TTrrr~~~sssssrr~~~r~~~~...................%%%%%...%%%%%%%%%%%TTT
+TTrrr~~~ssssss~~~rrr~~.....................%%%%...%%%%%%%%%%%%TT
+TTrrr~~~sssss~~~~rrr~~......................%%%...%%%%%~~%%%%%TT
+TTT~~~~~~~~~~~wwwrrr~~.................................~~.....TT
+TTTr~~~~~~~~~wwwwwr~~~...............dddddd.d.........~~~.....TT
+TTTr~~~~~~~~~wwwww~~~~~.........dddddddd~~~~~ddd......~~~.....TT
+TTrww~~~~dd~~wwwww~~~~.........dd~~~~~~~~~~~~~~~dmmm.~~~......TT
+TT~www~~~dd~...ww~~~~.........dd~~~~~~~~~~~~~~~~mmmm~~~.......TT
+TT~www~~~~~~..dd~~rrr.......dddm~~~~wwwwwwww~~~~~mmm~~........TT
+TT~wwwrrr~~~..dd~~rrr.......ddmmm~wwwwwwwwwwwww~~~~dd....~~r..TT
+TTT~w~rrr~~~~~dd~~.r........d~~m~wwwwwwwwwwwwww~~~~~dd..~ww~..TT
+TTT~~~~rr~~~~~dd~...........d~~~~wwwww...wwwwwwww~~~dd...~~...TT
+TTT.~~~~~~~~~~dd~...........d~~~~wwwww...wwwwwwww~~~d.........TT
+TT............dd........~~..d~~~~wwwwww~wwwwwwww~~~~d.........TT
+TT............dd........~~..dd~~~~~wwww~wwwwww~m~~~d..........TT
+TT..TTTTTTTTTTdd............mmm~~~~~~~w~wwww~~mmmddd..........TT
+TT..TTTTTTTTTTdd...........mmmmmdd~~~~~~~~~~~~~mdd............TT
+TTT.TTTTTTTTTTdd............mmm..dddd~~~d~~dddddd.............TT
+TTT...........dd.....................dddd~~~~.................TT
+TTT....HHHHHH.dd.........................~~~~.................TT
+TT......dddddddd..BBB.....................~~~.................TT
+TT......ddddddddddddddddd..dddd............~~~........BBBB....TT
+TT......ddddd........ddddddddddd............~~~.......ddddd...TT
+TT........dd.....~~~.........................~~~~~~..dddddddd.TT
+TTT..............~www~........................~~~~~~ddddmmmdd.TT
+TTT...............~~~............................~~~dddmmmmd~~TT
+TTT...................................................ddmmmd~~TT
+TT.........TT.......................TTTTT..............TTTT...TT
+TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT

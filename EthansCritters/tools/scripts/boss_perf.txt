@@ -1,0 +1,85 @@
+# What the toad's fight costs (M7a), with the board's card timing:
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/boss_perf.txt out/boss_perf
+# The toad is streamed from the card every drawn frame (one command, 3-6
+# blocks: ~1.7 ms, Path D) on top of the world's 16-17 blocks, so a fight
+# frame is two commands and ~21 blocks. I1 keeps the squire on his feet.
+# Z after each part: "intro" (the brambles close, it rises, the roar),
+# "near" (it hops at him and sits; he stands), "fighting" (he thrusts and
+# guards beside it: its red flash is a second copy on the card, free; his
+# thrust frames miss the cache), "angry" (half its HP knocked off with D:
+# quicker, double hops, two rot raccoons out of the reeds, drawn with
+# REMAP_ROT, chasing him while he fights). Z's fields: see slice_perf.txt.
+wait 30
+say W 776 268
+say I1
+say D 0
+say D 1
+say D 2
+say D 3
+say D 4
+say D 5
+step 300                # THE ROT STIRS, then the brambles part
+hold UP
+step 16
+release                 # into the arena: the fight
+say Z0
+perf start
+step 150
+say Z                   # intro
+say Z0
+step 240
+say A
+say Z                   # near
+say Z0
+tap A 1
+step 20
+tap A 1
+step 20
+tap A 1
+step 20
+hold B
+step 30
+release
+tap A 1
+step 20
+tap A 1
+step 20
+hold LEFT
+step 10
+release
+tap A 1
+step 20
+tap A 1
+step 20
+say A
+say Z                   # fighting
+say D 6 12              # down to 12 of 24: angry
+say Z0
+step 140                # it roars; its rot raccoons come out of the reeds
+say A
+hold B
+step 60
+release
+tap A 1
+step 20
+hold B
+step 40
+release
+hold RIGHT
+step 12
+release
+hold B
+step 60
+release
+tap A 1
+step 20
+hold LEFT
+step 12
+release
+hold B
+step 60
+release
+step 60
+say A
+say Z                   # angry
+perf stop

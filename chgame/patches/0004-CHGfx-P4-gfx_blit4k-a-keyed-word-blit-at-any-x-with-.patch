@@ -1,0 +1,419 @@
+From 04736fedc4a7e4254fb1e68284cf879ebaf1183e Mon Sep 17 00:00:00 2001
+From: bateske <kevin@bateske.com>
+Date: Sat, 3 Oct 2026 10:36:32 -0700
+Subject: [PATCH] CHGfx P4: gfx_blit4k, a keyed word blit at any x with flip,
+ remap, ink and dither
+
+Raw 4 bpp frames kept as whole 32-bit words (wWords a row, colour 15 the
+key), as art streamed from an SD card into a RAM cache arrives: each row
+is funnel-shifted into the framebuffer's words and merged under a SWAR
+mask of its opaque pixels, so any x costs the same. GFX_B4_FLIPH mirrors
+the padded width, GFX_B4_REMAP recolours (15 stays the key), GFX_B4_SOLID
+paints every opaque pixel in GFX_B4_INK(c), GFX_B4_DITHER stipples it
+through a 4x4 Bayer matrix anchored to the screen (level 0..16). Clipped
+to the clip rectangle on every edge.
+
+Its own file: the setup runs from flash, only the row loops sit in SRAM
+(~540 bytes, no calls, the frame pointer kept so -msave-restore cannot
+add __riscv_save calls into flash). Images that do not call it are
+byte-identical (CHWords, CHWordWheel, CHCrossword checked). Host test
+extras/tests/blit4k/test_blit4k.cpp: ~33,000 random cases against a
+pixel-at-a-time reference (every x phase, flips, remaps, ink, every dither
+level, random clips including empty and one-column ones).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../arduino/CHGame/libraries/CHGfx/README.md  |  16 ++
+ .../CHGfx/extras/tests/blit4k/test_blit4k.cpp | 131 ++++++++++++++
+ .../CHGame/libraries/CHGfx/keywords.txt       |   1 +
+ .../CHGame/libraries/CHGfx/src/CHGfx.h        |  26 +++
+ .../libraries/CHGfx/src/CHGfx_blit4k.cpp      | 163 ++++++++++++++++++
+ 5 files changed, 337 insertions(+)
+ create mode 100644 chgame/platform/board/arduino/CHGame/libraries/CHGfx/extras/tests/blit4k/test_blit4k.cpp
+ create mode 100644 chgame/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx_blit4k.cpp
+
+diff --git a/platform/board/arduino/CHGame/libraries/CHGfx/README.md b/platform/board/arduino/CHGame/libraries/CHGfx/README.md
+index 260d5d1..7ecc82a 100644
+--- a/platform/board/arduino/CHGame/libraries/CHGfx/README.md
++++ b/platform/board/arduino/CHGame/libraries/CHGfx/README.md
+@@ -283,6 +283,22 @@ right for a tumbling piece, not for a whole army.
+ `extras/sprite4.py` packs indexed or RGBA PNGs, whole sheets included
+ (`--tile W H`).
+ 
++**Raw word sprites** (`gfx_blit4k`) are for art kept as plain 4 bpp words,
++the framebuffer's own packing: frames streamed from an SD card into a RAM
++cache, say. Rows are whole 32-bit words and colour 15 is the key; any x
++costs the same (a funnel shift into the framebuffer's words, eight pixels
++tested for the key at a time). Flags mirror it (`GFX_B4_FLIPH`), recolour
++it (`GFX_B4_REMAP`), paint it in one ink (`GFX_B4_SOLID | GFX_B4_INK(c)`,
++a hit flash) or stipple it through a 4x4 Bayer matrix anchored to the
++screen (`GFX_B4_DITHER`, level 0..16: fades and shimmer). About 540 bytes
++of SRAM once a sketch calls it.
++
++```cpp
++gfx_blit4k(frame, x, y, wWords, h, facingLeft ? GFX_B4_FLIPH : 0);
++gfx_blit4k(frame, x, y, wWords, h, GFX_B4_REMAP, redFlash);
++gfx_blit4k(frame, x, y, wWords, h, GFX_B4_DITHER, nullptr, fade);   // 0..16
++```
++
+ | 16×12 sprite, `-O2` | Time |
+ |---|---:|
+ | `drawSprite4`, remapped | 81 µs |
+diff --git a/platform/board/arduino/CHGame/libraries/CHGfx/extras/tests/blit4k/test_blit4k.cpp b/platform/board/arduino/CHGame/libraries/CHGfx/extras/tests/blit4k/test_blit4k.cpp
+new file mode 100644
+index 0000000..36a4bbc
+--- /dev/null
++++ b/platform/board/arduino/CHGame/libraries/CHGfx/extras/tests/blit4k/test_blit4k.cpp
+@@ -0,0 +1,131 @@
++/*
++ * gfx_blit4k() against a pixel-at-a-time reference: random sprites (key
++ * density from none to most), every x phase and far off every edge, both
++ * flips, random remaps (entries of 15 included), solid ink, every dither
++ * level, and random clip rectangles (empty ones, single columns, every
++ * edge). The whole framebuffer is compared after each call, so a stray
++ * store outside the sprite or the clip fails too.
++ *
++ * Self-contained, so in a folder of its own (chsim.py test links every
++ * extras/tests/*.cpp with the whole library into one program): only
++ * CHGfx_blit4k.cpp is compiled with it, under CHSIM (no SRAM sections),
++ * with the simulator's Arduino.h:
++ *   c++ -std=gnu++17 -O2 -DCHSIM -DCH32X035 -I<CHGfx>/src -I<repo>/tools/chsim/host
++ *       extras/tests/blit4k/test_blit4k.cpp <CHGfx>/src/CHGfx_blit4k.cpp
++ * Arguments: --quick (fewer cases).
++ */
++#include <CHGfx.h>
++#include <CHGfx_internal.h>
++#include <stdio.h>
++#include <string.h>
++
++uint8_t gfx_fb[GFX_FB_BYTES] __attribute__((aligned(4)));
++GfxClip gfx__clip = {0, 0, GFX_W, GFX_H};
++
++static uint8_t want[GFX_FB_BYTES];
++static uint32_t rng = 0x1234567u;
++static uint32_t rnd() { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng; }
++static int rr(int lo, int hi) { return lo + (int)(rnd() % (uint32_t)(hi - lo + 1)); }
++
++static uint8_t px(const uint8_t *fb, int x, int y) { return (fb[y * GFX_FB_STRIDE + (x >> 1)] >> ((x & 1) * 4)) & 15; }
++static void put(uint8_t *fb, int x, int y, uint8_t c) {
++    uint8_t &b = fb[y * GFX_FB_STRIDE + (x >> 1)];
++    b = (x & 1) ? (uint8_t)((b & 0x0F) | (c << 4)) : (uint8_t)((b & 0xF0) | c);
++}
++
++static const uint8_t BAYER[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
++
++/* What gfx_blit4k() is documented to do, one pixel at a time. */
++static void reference(const uint8_t *src, int x, int y, int ww, int h, uint8_t fl, const uint8_t *remap,
++                      uint8_t level) {
++    const GfxClip k = gfx__clip;
++    int lv = (fl & GFX_B4_DITHER) ? (level > 16 ? 16 : level) : 16;
++    int w = ww * 8;
++    for (int r = 0; r < h; r++)
++        for (int j = 0; j < w; j++) {
++            int sj = (fl & GFX_B4_FLIPH) ? w - 1 - j : j;
++            uint8_t v = (src[r * ww * 4 + (sj >> 1)] >> ((sj & 1) * 4)) & 15;
++            if ((fl & GFX_B4_REMAP) && v != 15) v = remap[v] & 15;
++            if (v == 15 || ((fl & GFX_B4_SOLID) && (fl >> 4) == 15)) continue;     /* ink 15: the key */
++            int X = x + j, Y = y + r;
++            if (X < k.x0 || X >= k.x1 || Y < k.y0 || Y >= k.y1) continue;
++            if (BAYER[Y & 3][X & 3] >= lv) continue;
++            put(want, X, Y, (fl & GFX_B4_SOLID) ? (uint8_t)(fl >> 4) : v);
++        }
++}
++
++static int checks, fails;
++
++static void one(int ww, int h, int x, int y, uint8_t fl, const uint8_t *remap, uint8_t level, int keyPct,
++                const char *what) {
++    static uint32_t buf[16 * 40 + 1];
++    uint8_t *src = (uint8_t *)buf;
++    for (int i = 0; i < ww * 4 * h; i++) {
++        uint8_t b = 0;
++        for (int n = 0; n < 2; n++) b |= (uint8_t)((rr(0, 99) < keyPct ? 15 : rr(0, 14)) << (4 * n));
++        src[i] = b;
++    }
++    for (int i = 0; i < GFX_FB_BYTES; i++) gfx_fb[i] = want[i] = (uint8_t)rnd();
++    reference(src, x, y, ww, h, fl, remap, level);
++    gfx_blit4k(src, x, y, ww, h, fl, remap, level);
++    checks++;
++    if (memcmp(gfx_fb, want, GFX_FB_BYTES)) {
++        if (fails++ < 10) {
++            int bx = 0, by = 0;
++            for (int i = 0; i < GFX_W * GFX_H; i++)
++                if (px(gfx_fb, i % GFX_W, i / GFX_W) != px(want, i % GFX_W, i / GFX_W)) { bx = i % GFX_W; by = i / GFX_W; break; }
++            printf("FAIL %s: w%d h%d at %d,%d flags %02X level %d clip %d,%d-%d,%d: first wrong pixel %d,%d is %d, want %d\n",
++                   what, ww, h, x, y, fl, level, gfx__clip.x0, gfx__clip.y0, gfx__clip.x1, gfx__clip.y1, bx, by,
++                   px(gfx_fb, bx, by), px(want, bx, by));
++        }
++    }
++}
++
++static void setClip(int x0, int y0, int x1, int y1) {
++    gfx__clip.x0 = (int16_t)x0; gfx__clip.y0 = (int16_t)y0;
++    gfx__clip.x1 = (int16_t)x1; gfx__clip.y1 = (int16_t)y1;
++}
++
++int main(int argc, char **argv) {
++    bool quick = argc > 1 && !strcmp(argv[1], "--quick");
++    uint8_t remap[16];
++
++    /* Every x phase and every flag combination, unclipped, near the middle and across every edge. */
++    for (int fl = 0; fl < 16; fl++)
++        for (int x = -40; x < 140; x += quick ? 7 : 1) {
++            for (int i = 0; i < 16; i++) remap[i] = (uint8_t)rr(0, 15);
++            setClip(0, 0, GFX_W, GFX_H);
++            uint8_t f = (uint8_t)(fl | (rr(0, 15) << 4));
++            one(rr(1, 6), rr(1, 24), x, rr(-30, 130), f, remap, (uint8_t)rr(0, 17), rr(0, 100), "phase");
++        }
++
++    /* Random clips: empty, one column, one row, each edge inside a word. */
++    int n = quick ? 3000 : 30000;
++    for (int i = 0; i < n; i++) {
++        int x0 = rr(0, 128), x1 = rr(x0, 128), y0 = rr(0, 128), y1 = rr(y0, 128);
++        if (rr(0, 9) == 0) x1 = x0 + (x0 < 128);              /* one column */
++        if (rr(0, 19) == 0) x1 = x0;                          /* empty */
++        setClip(x0, y0, x1, y1);
++        for (int j = 0; j < 16; j++) remap[j] = (uint8_t)rr(0, 15);
++        uint8_t f = (uint8_t)rr(0, 255);
++        int ww = rr(1, 16);
++        one(ww, rr(0, 40), rr(-ww * 8 - 4, 132), rr(-44, 132), f, remap, (uint8_t)rr(0, 16), rr(0, 100), "clip");
++    }
++
++    /* Each dither level alone over a solid block: exactly level/16 of the pixels. */
++    setClip(0, 0, GFX_W, GFX_H);
++    for (int lv = 0; lv <= 16; lv++) {
++        static uint32_t blk[4 * 16];
++        memset(blk, 0x11, sizeof blk);
++        memset(gfx_fb, 0, sizeof gfx_fb);
++        gfx_blit4k((const uint8_t *)blk, 37, 21, 4, 16, GFX_B4_DITHER, nullptr, (uint8_t)lv);
++        int lit = 0;
++        for (int yy = 21; yy < 37; yy++)
++            for (int xx = 37; xx < 69; xx++) lit += px(gfx_fb, xx, yy) == 1;
++        checks++;
++        if (lit != 32 * 16 * lv / 16) { fails++; printf("FAIL dither level %d: %d of 512 pixels\n", lv, lit); }
++    }
++
++    printf("blit4k: %d checks, %d failures\n", checks, fails);
++    return fails ? 1 : 0;
++}
+diff --git a/platform/board/arduino/CHGame/libraries/CHGfx/keywords.txt b/platform/board/arduino/CHGame/libraries/CHGfx/keywords.txt
+index c1cc243..8a1da98 100644
+--- a/platform/board/arduino/CHGame/libraries/CHGfx/keywords.txt
++++ b/platform/board/arduino/CHGame/libraries/CHGfx/keywords.txt
+@@ -93,6 +93,7 @@ gfx_line	KEYWORD2
+ gfx_circle	KEYWORD2
+ gfx_fillCircle	KEYWORD2
+ gfx_blit	KEYWORD2
++gfx_blit4k	KEYWORD2
+ gfx_char	KEYWORD2
+ gfx_text	KEYWORD2
+ gfx_textScaled	KEYWORD2
+diff --git a/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.h b/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.h
+index f5081d1..af404cb 100644
+--- a/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.h
++++ b/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.h
+@@ -342,6 +342,32 @@ void gfx_fillCircle(int cx, int cy, int r, uint8_t c);
+  * (the opaque even-x case runs at memcpy speed). */
+ void gfx_blit(const uint8_t *spr, int x, int y, int w, int h, int transparent);
+ 
++/* Keyed word blit: art streamed from a card or kept raw in RAM. Source
++ * rows are wWords (1..16, up to 128 px) 32-bit words each, src 4-byte
++ * aligned, packed like the framebuffer (pixel i of a word in bits
++ * 4i..4i+3); colour 15 is transparent. Any x: each row is funnel-shifted
++ * into the framebuffer's words and merged under a mask of its opaque
++ * pixels, so it costs the same at every x. Clipped to the clip
++ * rectangle. ~540 bytes of SRAM when used. flags:
++ *   GFX_B4_FLIPH   mirror the whole padded width (wWords * 8 px)
++ *   GFX_B4_REMAP   pixel = remap[pixel] (16 entries; 15 stays transparent,
++ *                  and an entry of 15 makes that colour transparent)
++ *   GFX_B4_SOLID   every opaque pixel in the ink colour, GFX_B4_INK(c)
++ *                  (0..14; 15 is the key, so it draws nothing): a white
++ *                  hit flash, a silhouette
++ *   GFX_B4_DITHER  draw only where a 4x4 Bayer threshold < level (0..16:
++ *                  0 nothing, 8 half, 16 all), anchored to the screen so
++ *                  a moving sprite's stipple does not crawl; without the
++ *                  flag level is ignored
++ * remap may be nullptr unless GFX_B4_REMAP is set. */
++#define GFX_B4_FLIPH   0x01
++#define GFX_B4_REMAP   0x02
++#define GFX_B4_SOLID   0x04
++#define GFX_B4_DITHER  0x08
++#define GFX_B4_INK(c)  ((uint8_t)(((c) & 15) << 4))
++void gfx_blit4k(const uint8_t *src, int x, int y, int wWords, int h, uint8_t flags,
++                const uint8_t *remap = nullptr, uint8_t level = 16);
++
+ /* ------------------------------------------------------------------ */
+ /* Shapes                                                              */
+ /* ------------------------------------------------------------------ */
+diff --git a/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx_blit4k.cpp b/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx_blit4k.cpp
+new file mode 100644
+index 0000000..d9f6655
+--- /dev/null
++++ b/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx_blit4k.cpp
+@@ -0,0 +1,163 @@
++/*
++ * CHGfx_blit4k.cpp - gfx_blit4k(): a keyed blit of raw 4 bpp words at any
++ * x, with flip, remap, solid ink and an ordered-dither fade.
++ *
++ * Made for art streamed from an SD card into a RAM cache, where frames
++ * arrive as whole words: a source row is wWords words, so a row lands in
++ * the framebuffer as wWords + 1 word read-modify-writes whatever x is.
++ * At x % 8 == s the output word is (cur << 4s) | (prev >> (32 - 4s)), the
++ * classic funnel shift, with colour 15 shifted in on both sides.
++ *
++ * Transparency is found eight pixels at a time (SWAR): a nibble is 15
++ * when all its bits are set, so
++ *     t = c & c >> 1;  t &= t >> 2;  t &= 0x11111111
++ * leaves bit 0 of each key nibble, and t * 15 is the key mask. The
++ * opaque mask m = ~that, ANDed with the clip edges and the dither mask;
++ * the store is (d & ~m) | (c & m), skipped when m is 0 (most words at a
++ * sprite's edges).
++ *
++ * Split in two for RAM: the setup (clip, masks, tables) runs once a call
++ * from flash, and only the row loops sit in SRAM (each GFX_RAMFUNC costs
++ * its size in RAM; all of it in SRAM was ~820 bytes, the rows alone are
++ * ~540). Each source row is first copied (flipped, remapped, inked) into
++ * a row of words on the stack with a key word either side; the merge loop
++ * then reads two neighbours per output word, visits only the columns
++ * inside the clip and has no per-flag branches: ~27 instructions a word
++ * stored, ~22 a word left alone. Remap goes nibble by nibble: a 256-entry
++ * byte-pair table costs ~256 steps to build, as much as a 24x21 sprite's
++ * remap, and 256 bytes of stack. An ink of 15 is the key: nothing shows.
++ *
++ * The row function keeps its frame pointer on purpose: with
++ * -msave-restore GCC may otherwise save registers through __riscv_save_N,
++ * which lives in flash.
++ */
++#include "CHGfx_internal.h"
++
++#ifdef CHSIM
++#define B4_NOSAVE
++#else
++#define B4_NOSAVE __attribute__((optimize("no-omit-frame-pointer")))
++#endif
++
++#define B4_MAXW (GFX_W / 8)
++
++namespace {
++struct B4Job {
++    const uint32_t *row;            /* the first source row drawn */
++    uint32_t *fb;                   /* its framebuffer row, at word column xw (output word 0) */
++    int words, rows, y;             /* source words a row; rows drawn; the first one's y */
++    int oa, ob;                     /* output words inside the clip: [oa, ob) */
++    uint32_t sh, rs;                /* funnel: cur << sh | (prev >> 1) >> rs */
++    uint32_t ma, mb;                /* clip masks of words oa and ob - 1 */
++    uint32_t ink, dither[4];        /* solid colour in every nibble (not 15); Bayer mask by y & 3 */
++    uint8_t remap[16];              /* 15 kept */
++    bool flip, rm, solid;
++};
++}
++
++/* The key mask of eight pixels: 0xF in each nibble that is 15. */
++static GFX_INLINE uint32_t keyMask(uint32_t c) {
++    uint32_t q = c & (c >> 1);
++    q &= q >> 2;
++    return (q & 0x11111111u) * 15;
++}
++
++GFX_RAMFUNC(blit4k) B4_NOSAVE static void blit4kRows(const B4Job &j) {
++    uint32_t rb[B4_MAXW + 2];       /* key, the row, key */
++    int words = j.words;
++    rb[0] = ~0u;
++    rb[words + 1] = ~0u;
++    bool plain = !(j.flip | j.rm | j.solid);
++    const uint32_t *row = j.row;
++    uint32_t *fb = j.fb;
++    for (int n = j.rows, y = j.y; n > 0; n--, y++, row += words, fb += GFX_FB_STRIDE / 4) {
++        uint32_t *w = rb + 1, *we = w + words;
++        if (plain) {
++            for (const uint32_t *s = row; w < we;) *w++ = *s++;
++        } else {
++            for (const uint32_t *s = row + words; w < we;) {
++                uint32_t v;
++                if (j.flip) {               /* words from the end, nibbles reversed */
++                    v = *--s;
++                    v = (v >> 16) | (v << 16);
++                    v = ((v >> 8) & 0x00FF00FFu) | ((v & 0x00FF00FFu) << 8);
++                    v = ((v >> 4) & 0x0F0F0F0Fu) | ((v & 0x0F0F0F0Fu) << 4);
++                } else {
++                    v = row[w - rb - 1];
++                }
++                if (j.rm) {
++                    uint32_t u = 0;
++                    for (uint32_t b = 0; b < 32; b += 4) u |= (uint32_t)j.remap[(v >> b) & 15] << b;
++                    v = u;
++                }
++                if (j.solid) {              /* the ink wherever it is not the key */
++                    uint32_t k = keyMask(v);
++                    v = (v & k) | (j.ink & ~k);
++                }
++                *w++ = v;
++            }
++        }
++        /* merge: output word o is rb[o + 1] funnelled with rb[o] */
++        uint32_t dm = j.dither[y & 3], em = j.ma, sh = j.sh, rs = j.rs;
++        const uint32_t *r = rb + j.oa;
++        for (uint32_t *d = fb + j.oa, *de = fb + j.ob; d < de; d++, r++) {
++            uint32_t c = (r[1] << sh) | ((r[0] >> 1) >> rs);
++            if (d == de - 1) em &= j.mb;
++            uint32_t m = ~keyMask(c) & dm & em;
++            em = ~0u;
++            if (m) *d = (*d & ~m) | (c & m);
++        }
++    }
++}
++
++void gfx_blit4k(const uint8_t *src, int x, int y, int wWords, int h, uint8_t flags,
++                const uint8_t *remap, uint8_t level) {
++    const GfxClip k = gfx__clip;
++    if (!(flags & GFX_B4_DITHER) || level > 16) level = 16;
++    int y1 = y + h;
++    if (y1 > k.y1) y1 = k.y1;
++    int r0 = y < k.y0 ? k.y0 - y : 0;
++    if (wWords <= 0 || wWords > B4_MAXW || !level || y + r0 >= y1 || k.x1 <= k.x0) return;
++
++    /* Output word o lands on framebuffer word column xw + o; the first
++     * and last inside the clip may be only partly inside. */
++    B4Job j;
++    int xw = x >> 3;
++    j.sh = (uint32_t)(x & 7) * 4;
++    j.rs = 31 - j.sh;                       /* (prev >> 1) >> rs: no shift by 32 at sh 0 */
++    int nOut = wWords + (j.sh != 0);
++    j.oa = (k.x0 >> 3) - xw;
++    j.ob = ((k.x1 - 1) >> 3) - xw + 1;
++    j.ma = j.oa >= 0 ? ~0u << ((k.x0 & 7) * 4) : ~0u;
++    j.mb = j.ob <= nOut ? ~0u >> ((7 - ((k.x1 - 1) & 7)) * 4) : ~0u;
++    if (j.oa < 0) j.oa = 0;
++    if (j.ob > nOut) j.ob = nOut;
++    if (j.oa >= j.ob) return;
++
++    j.flip = flags & GFX_B4_FLIPH;
++    j.rm = (flags & GFX_B4_REMAP) && remap;
++    if (j.rm) {
++        for (uint32_t i = 0; i < 15; i++) j.remap[i] = remap[i] & 15;
++        j.remap[15] = 15;
++    }
++    j.solid = flags & GFX_B4_SOLID;
++    j.ink = (uint32_t)(flags >> 4) * 0x11111111u;
++    /* Bayer thresholds packed a row per 16 bits, nibble i = column i; the
++     * framebuffer words start on multiples of 8, so a row's mask is the
++     * same four columns twice. */
++    for (uint32_t r = 0; r < 4; r++) {
++        uint32_t b = (r & 2 ? 0x5D7F91B3u : 0x6E4CA280u) >> ((r & 1) * 16), m = ~0u;
++        if (level < 16) {
++            m = 0;
++            for (uint32_t i = 0; i < 16; i += 4)
++                if (((b >> i) & 15) < level) m |= 0x000F000Fu << i;
++        }
++        j.dither[r] = m;
++    }
++    j.words = wWords;
++    j.row = (const uint32_t *)src + r0 * wWords;
++    j.fb = (uint32_t *)gfx_fb + (y + r0) * (GFX_FB_STRIDE / 4) + xw;
++    j.rows = y1 - y - r0;
++    j.y = y + r0;
++    blit4kRows(j);
++}
+-- 
+2.53.0.windows.1
+

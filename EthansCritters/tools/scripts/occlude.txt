@@ -1,0 +1,98 @@
+# The willows over whoever walks behind them (M6a, src/engine/Occluders.h):
+# an actor whose feet are above a tree's base line (the trunk's foot) is
+# behind it, and the tree's rows over him are streamed from the card's OCCL
+# section and drawn on top of him; below the base line he is drawn over the
+# tree. Snaps: the same moment with the passes off (O0, *_off: the squire
+# over the canopy as before M6a) and on (*_on); the lone willow north of
+# the hut (T2 at 360,520): behind its trunk, behind its east drapes, in
+# front, then walked round; the hut's willows from the north, a raccoon
+# beside him; Willow Hollow south of the chameleons' clearing. Then what it
+# costs, `step` drawing every tick as the board does; for the board's card
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/occlude.txt out/occlude
+# Z: the frame stats and OCCL (passes made, shed for time, their blocks,
+# average and worst us of a pass: the command, the blocks, the last blit).
+wait 30
+say W 340 500           # the lone willow: behind its trunk's west side, as deep as the ground lets him (feet 20 px above the base; the ground where a willow would hide half of him is solid)
+say O0                  # (in play only; it stays until O1)
+step 4
+snap trunk_off
+say O1
+step 1
+snap trunk_on           # gone behind the trunk and the drapes
+say O0
+say W 396 492           # behind its east drapes
+step 4
+snap drapes_off
+say O1
+step 1
+snap drapes_on          # the drapes over all of him but the arm past the tree's edge
+say W 360 536           # in front of the trunk (feet 16 px below the base): over the tree
+step 4
+snap front
+say W 336 540           # walked round: up its west side, behind the trunk, down its east side
+step 2
+hold UP
+step 30
+release
+snap walk_west          # the drapes over his right side
+hold RIGHT
+step 20
+release
+snap walk_behind        # behind the trunk
+hold RIGHT
+step 20
+hold DOWN
+step 34
+release
+snap walk_front         # past the base line: over the tree again
+say O0
+say W 162 478           # north of the hut, behind its willows (at the canopies' top edge: the ground under them is solid)
+say C 0 184 470         # a raccoon beside him, behind them too
+step 30
+snap hut_off
+say O1
+step 1
+snap hut_on             # his pass made, the raccoon's shed for time (it shows over the canopy)
+say O0
+say W 431 158           # Willow Hollow: south of the clearing, behind the willows there
+step 4
+snap hollow_off
+say O1
+step 1
+snap hollow_on          # the willow in front of him chosen of the three he is behind
+say W 336 540           # what it costs: the walk round the lone willow, every frame drawn
+step 2
+say Z0
+perf start
+hold UP
+step 30
+hold RIGHT
+step 40
+hold DOWN
+step 34
+hold LEFT
+step 40
+release
+perf lone
+say Z
+say W 431 158           # behind the crowd in Willow Hollow (two passes most frames)
+step 2
+say Z0
+perf start
+hold LEFT
+step 60
+hold UP
+step 20
+release
+step 30
+perf hollow
+say Z
+say W 162 478           # behind the hut's willows, two raccoons at him (critters' passes, shed for time)
+say C 0 184 470
+say C 0 140 470
+step 2
+say Z0
+perf start
+step 120
+perf hut
+say Z

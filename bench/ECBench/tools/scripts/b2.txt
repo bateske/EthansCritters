@@ -1,0 +1,4 @@
+# B2: stream latency, 200 reads per size and region, each with a flush.
+bench Z2
+snap stream
+summary

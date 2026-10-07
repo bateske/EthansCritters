@@ -1,0 +1,10 @@
+# Elthen's purchased sprite packs: never published on their own (put your copy here to build)
+Sprites/
+
+# build output
+out/
+build/
+tools/chsim/build/
+tools/tests/build/
+__pycache__/
+*.pyc

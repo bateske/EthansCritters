@@ -1,0 +1,145 @@
+ECBN B1 when=boot card=ok init_us=4120 mount_us=3724 open_us=25543 header_us=2192 runs=1 blocks=65536
+ECBN B1 type=SDHC/SDXC mid=65 product=SD16G card_mb=14916 mount_rc=0 find_rc=0
+ECBN B1 run i=0 lba=24319 blocks=65536
+ECBN B3 mb r=0 us=649 ok=1
+ECBN B3 mb r=1 us=1348 ok=1
+ECBN B3 mb r=2 us=920 ok=1
+ECBN B3 mb r=3 us=854 ok=1
+ECBN B3 mb r=4 us=905 ok=1
+ECBN B3 mb r=5 us=1397 ok=1
+ECBN B3 mb r=6 us=925 ok=1
+ECBN B3 mb r=7 us=899 ok=1
+ECBN B3 mb r=8 us=901 ok=1
+ECBN B3 mb r=9 us=1425 ok=1
+ECBN B3 mb r=10 us=899 ok=1
+ECBN B3 mb r=11 us=899 ok=1
+ECBN B3 mb r=12 us=925 ok=1
+ECBN B3 mb r=13 us=1399 ok=1
+ECBN B3 mb r=14 us=900 ok=1
+ECBN B3 mb r=15 us=925 ok=1
+ECBN B3 mb r=16 us=900 ok=1
+ECBN B3 mb r=17 us=1398 ok=1
+ECBN B3 mb r=18 us=869 ok=1
+ECBN B3 mb r=19 us=875 ok=1
+ECBN B3 mb r=20 us=869 ok=1
+ECBN B3 mb r=21 us=1367 ok=1
+ECBN B3 mb r=22 us=869 ok=1
+ECBN B3 mb r=23 us=868 ok=1
+ECBN B3 mb r=24 us=869 ok=1
+ECBN B3 mb r=25 us=869 ok=1
+ECBN B3 mb r=26 us=869 ok=1
+ECBN B3 mb r=27 us=868 ok=1
+ECBN B3 mb r=28 us=869 ok=1
+ECBN B3 mb r=29 us=869 ok=1
+ECBN B3 mb r=30 us=854 ok=1
+ECBN B3 mb r=31 us=854 ok=1
+ECBN B3 when=boot mbs=32 warm_us=649 p50=899 p95=1399 max=1425 over10ms=0 fail=0 bad=0
+ECBN B8 mb r=0 tries=1 to_data_us=1674 ok=1
+ECBN B8 mb r=1 tries=1 to_data_us=1155 ok=1
+ECBN B8 mb r=2 tries=1 to_data_us=1150 ok=1
+ECBN B8 mb r=3 tries=1 to_data_us=1154 ok=1
+ECBN B8 mb r=4 tries=1 to_data_us=1673 ok=1
+ECBN B8 mb r=5 tries=1 to_data_us=1150 ok=1
+ECBN B8 mb r=6 tries=1 to_data_us=1147 ok=1
+ECBN B8 mb r=7 tries=1 to_data_us=1176 ok=1
+ECBN B8 mb r=8 tries=1 to_data_us=1650 ok=1
+ECBN B8 mb r=9 tries=1 to_data_us=1166 ok=1
+ECBN B8 mb r=10 tries=1 to_data_us=1184 ok=1
+ECBN B8 mb r=11 tries=1 to_data_us=1160 ok=1
+ECBN B8 mb r=12 tries=1 to_data_us=1660 ok=1
+ECBN B8 mb r=13 tries=1 to_data_us=1179 ok=1
+ECBN B8 mb r=14 tries=1 to_data_us=1159 ok=1
+ECBN B8 mb r=15 tries=1 to_data_us=1161 ok=1
+ECBN B8 mb r=16 tries=1 to_data_us=1683 ok=1
+ECBN B8 mb r=17 tries=1 to_data_us=1130 ok=1
+ECBN B8 mb r=18 tries=1 to_data_us=1135 ok=1
+ECBN B8 mb r=19 tries=1 to_data_us=1131 ok=1
+ECBN B8 mb r=20 tries=1 to_data_us=1627 ok=1
+ECBN B8 mb r=21 tries=1 to_data_us=1131 ok=1
+ECBN B8 mb r=22 tries=1 to_data_us=1131 ok=1
+ECBN B8 mb r=23 tries=1 to_data_us=1130 ok=1
+ECBN B8 mb r=24 tries=1 to_data_us=1133 ok=1
+ECBN B8 mb r=25 tries=1 to_data_us=1131 ok=1
+ECBN B8 mb r=26 tries=1 to_data_us=1128 ok=1
+ECBN B8 mb r=27 tries=1 to_data_us=1131 ok=1
+ECBN B8 mb r=28 tries=1 to_data_us=1126 ok=1
+ECBN B8 mb r=29 tries=1 to_data_us=1116 ok=1
+ECBN B8 mb r=30 tries=1 to_data_us=1115 ok=1
+ECBN B8 mb r=31 tries=1 to_data_us=1116 ok=1
+ECBN B8 cold timeout_us=5000 mbs=32 timed_out=0 lost=0 tries_max=1 to_data_p50=1150 to_data_max=1683
+ECBN B8 forced n=20 recovered=20 reread_ok=20
+ECBN B8 cost recover_us=66 recover_max=67 recover_idle=63 init_us=4118 init_max=4119
+ECBN B2 mode=rnd n=1 iters=200 p50=1159 p95=1388 max=1419 fail=0 bad=0
+ECBN B2 mode=rnd n=2 iters=200 p50=1379 p95=1610 max=1613 fail=0 bad=0
+ECBN B2 mode=rnd n=4 iters=200 p50=1537 p95=2031 max=2057 fail=0 bad=0
+ECBN B2 mode=rnd n=8 iters=200 p50=2666 p95=2939 max=2944 fail=0 bad=0
+ECBN B2 mode=rnd n=17 iters=200 p50=4417 p95=4916 max=4964 fail=0 bad=0
+ECBN B2 mode=rnd n=32 iters=200 p50=8024 p95=8251 max=8270 fail=0 bad=0
+ECBN B2 fit mode=rnd cmd_us=832 blk_us=221.7
+ECBN B2 mode=warm n=1 iters=200 p50=864 p95=895 max=1365 fail=0 bad=0
+ECBN B2 mode=warm n=2 iters=200 p50=1087 p95=1117 max=1118 fail=0 bad=0
+ECBN B2 mode=warm n=4 iters=200 p50=1527 p95=1561 max=1563 fail=0 bad=0
+ECBN B2 mode=warm n=8 iters=200 p50=2417 p95=2449 max=2450 fail=0 bad=0
+ECBN B2 mode=warm n=17 iters=200 p50=4406 p95=4443 max=4447 fail=0 bad=0
+ECBN B2 mode=warm n=32 iters=200 p50=7727 p95=7771 max=7775 fail=0 bad=0
+ECBN B2 fit mode=warm cmd_us=644 blk_us=221.3
+ECBN B2 run_splits=0
+ECBN B4 progress frames=250 bad=0 fail=0
+ECBN B4 progress frames=500 bad=0 fail=0
+ECBN B4 progress frames=750 bad=0 fail=0
+ECBN B4 progress frames=1000 bad=0 fail=0
+ECBN B4 progress frames=1250 bad=0 fail=0
+ECBN B4 progress frames=1500 bad=0 fail=0
+ECBN B4 progress frames=1750 bad=0 fail=0
+ECBN B4 frames=2000 blocks=34000 bad=0 fail=0 recovered=0 inits=0
+ECBN B4 avg_us=4570 max_us=5524 over_budget=2000 budget_us=4000 timeout_us=1000000
+ECBN B5 what=blit32_even us=226.1
+ECBN B5 what=blit32_odd us=442.2
+ECBN B5 what=sprite4_24x21 us=173.9
+ECBN B5 what=sprite4_remap us=175.5
+ECBN B5 what=sprite4_fliph us=173.1
+ECBN B5 what=remaprect_24x8 us=50.5
+ECBN B5 what=copy16_screen us=229.4
+ECBN B5 what=column_p0 us=26.1
+ECBN B5 what=column_p3 us=51.5
+ECBN B5 what=world16_screen us=420.1
+ECBN B5 what=world17_screen us=844.1
+ECBN B5 what=flush_start us=102.0
+ECBN B5 what=flush_wire us=8412.0
+ECBN B5 column_check bad_px=0
+ECBN B1 when=again card=ok init_us=4118 mount_us=3421 open_us=25562 header_us=2196 runs=1 blocks=65536
+ECBN B1 type=SDHC/SDXC mid=65 product=SD16G card_mb=14916 mount_rc=0 find_rc=0
+ECBN B1 run i=0 lba=24319 blocks=65536
+ECBN B3 mb r=0 us=650 ok=1
+ECBN B3 mb r=1 us=1354 ok=1
+ECBN B3 mb r=2 us=920 ok=1
+ECBN B3 mb r=3 us=857 ok=1
+ECBN B3 mb r=4 us=905 ok=1
+ECBN B3 mb r=5 us=1398 ok=1
+ECBN B3 mb r=6 us=925 ok=1
+ECBN B3 mb r=7 us=899 ok=1
+ECBN B3 mb r=8 us=900 ok=1
+ECBN B3 mb r=9 us=1425 ok=1
+ECBN B3 mb r=10 us=904 ok=1
+ECBN B3 mb r=11 us=900 ok=1
+ECBN B3 mb r=12 us=930 ok=1
+ECBN B3 mb r=13 us=1399 ok=1
+ECBN B3 mb r=14 us=900 ok=1
+ECBN B3 mb r=15 us=925 ok=1
+ECBN B3 mb r=16 us=898 ok=1
+ECBN B3 mb r=17 us=1399 ok=1
+ECBN B3 mb r=18 us=870 ok=1
+ECBN B3 mb r=19 us=875 ok=1
+ECBN B3 mb r=20 us=869 ok=1
+ECBN B3 mb r=21 us=1367 ok=1
+ECBN B3 mb r=22 us=870 ok=1
+ECBN B3 mb r=23 us=870 ok=1
+ECBN B3 mb r=24 us=869 ok=1
+ECBN B3 mb r=25 us=867 ok=1
+ECBN B3 mb r=26 us=869 ok=1
+ECBN B3 mb r=27 us=868 ok=1
+ECBN B3 mb r=28 us=869 ok=1
+ECBN B3 mb r=29 us=863 ok=1
+ECBN B3 mb r=30 us=854 ok=1
+ECBN B3 mb r=31 us=854 ok=1
+ECBN B3 when=again mbs=32 warm_us=650 p50=899 p95=1399 max=1425 over10ms=0 fail=0 bad=0

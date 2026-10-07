@@ -1,0 +1,56 @@
+# The author's report after the second occluder fix: start, walk down into
+# the willows south of the hut, and let the den's raccoons come at him
+# through them (I1: he takes no harm). Five willows overlap there and two
+# passes are all a frame affords, so it is the hardest place for the
+# occluders: his best tree (by his own overlap, a tree a raccoon is behind
+# winning his ties), then the tree with the most raccoon behind it; a pass
+# over every actor behind its tree, made after the last of them, over their
+# boxes and their shadows. Snaps where they were wrong before (his shadow's
+# last row over the canopy; a raccoon over it, its tree shed or never
+# chosen); Z at the end. Run it with the board knobs:
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/hut_raccoons.txt out/hut_raccoons
+wait 30
+say W 160 626
+say I1
+step 2
+say Z0
+hold DOWN
+step 40
+release
+snap down               # under the hut's southern willows, his shadow under them too
+step 60
+hold RIGHT
+step 50
+release
+step 80
+snap first              # the first raccoons at him through the trees
+tap A 1
+step 40
+hold DOWN+LEFT
+step 30
+release
+step 90
+snap cluster            # deep in the cluster, raccoons behind other trees than his
+hold LEFT
+step 40
+release
+step 80
+hold UP+RIGHT
+step 40
+release
+step 60
+hold RIGHT
+step 60
+release
+step 100
+snap east
+hold DOWN
+step 30
+release
+step 120
+hold LEFT
+step 70
+release
+step 100
+snap west
+say Z

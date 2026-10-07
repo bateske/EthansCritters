@@ -1,0 +1,38 @@
+# What the world costs a frame: a walk across the swamp with the camera
+# panning in every direction, the world streamed from the card each frame
+# (one read of 16 or 17 column blocks, each copied into the framebuffer as
+# the next arrives). For board-like numbers give the simulator the card the
+# board measured:
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/world_perf.txt out/world_perf
+# (perf: rnd = the average from gfx_wait() to the flush, max = the worst, us.)
+wait 30
+tap A
+wait 4
+say W 84 680            # the south-west corner
+wait 2
+perf start              # (the counters start here)
+hold RIGHT
+wait 240                # east along the south meadows
+hold UP+RIGHT
+wait 120
+hold UP
+wait 160                # north past the dam
+hold LEFT
+wait 200                # west along the dam's north bank
+hold UP+LEFT
+wait 100
+hold LEFT
+wait 120
+release
+perf pan
+say W 636 142           # Willow Hollow, then still: the camera stops
+wait 60
+perf still
+say W 776 344           # through the gate into The Rot
+hold UP
+wait 60
+hold RIGHT
+wait 120
+release
+perf rot
+snap rot_end

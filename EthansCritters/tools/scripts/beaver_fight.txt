@@ -1,0 +1,108 @@
+# The beavers (M6b), by the west lodge in the dam pond. The lodge keeps up
+# to 3 alive while the squire is within 160 px; one puffs out of the water
+# by it, sees him in the shallows and dives (a splash; under the water
+# nothing can touch it), swims at him under the surface (rings on the
+# water drifting his way), comes up right beside him (the ascent: the
+# tell) and bites (the hurt row, the red screen). He turns and thrusts:
+# the damage row and a red flash; three blows kill it: flat, then the
+# burst of chips and water. Then (I1, the lodge knocked about with D) a
+# beaver with a stick swims in from the pond and mends the lodge (+1, the
+# chips; battered -> whole again). In the open shallows of Reed Shallows
+# three carriers (C 4) are put 44 px from him: threatened, each stops,
+# holds the stick still (the tell) and throws it spinning at him: the
+# first he blocks (B held: tink, it breaks), the second hits him (a half
+# heart), the third he parries (B tapped just before) and it flies back
+# and strikes the beaver. Last, the lodge is broken down: the last blows,
+# LODGE CLEARED, the drop, the pip. A prints the actors at each beat.
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/beaver_fight.txt out/beaver_fight
+wait 30
+say W 556 428           # in the shallows north-east of the west lodge
+step 8
+snap spawn              # the first beaver puffs up in the water by the lodge
+step 19
+snap dive               # it has seen him: down it goes (a splash)
+step 33
+snap under              # rings on the water, coming his way
+step 35
+snap rise               # up beside him: the tell
+step 17
+snap bite               # the bite: the hurt row, the red screen
+say A
+step 22
+tap LEFT 1              # he turns on it ...
+tap A 1
+step 11
+snap hit                # ... and thrusts: the damage row, the red flash, -1
+say A
+say I1                  # (from here he takes no harm: the lodge keeps sending beavers)
+tap A 1
+step 20
+tap A 1
+step 20
+tap A 1
+step 20
+tap A 1
+step 20
+tap A 1
+step 1
+snap killed             # the third blow: flat ...
+step 11
+snap burst              # ... then the burst of chips and water
+say A
+say W 504 412           # on the bank above the lodge
+say I1
+say D 2 3               # the lodge knocked about: battered (HP 5)
+say C 4 584 468 2       # a beaver with a stick, out on the pond, from the lodge
+step 40
+snap carrier            # it swims for the lodge, the stick in its teeth
+step 55
+snap repair             # mending: +1, chips (HP 6: whole again)
+say A
+say I0
+say W 160 372           # the open shallows of Reed Shallows, no lodge near
+tap LEFT 1
+step 10
+hold B                  # he guards, facing west
+say C 4 116 370         # a carrier 44 px from him: threatened
+step 30
+snap throw_tell         # it stops and holds the stick still
+step 10
+snap throw              # thrown: the stick spins at him
+step 11
+snap block              # on the guard: tink, it breaks
+release
+say A
+say W 160 372
+tap LEFT 1
+step 10
+say C 4 116 370         # the next: no guard
+step 51
+snap stick_hit          # a half heart, the red screen, the stick in bits
+say A
+say W 160 372
+tap LEFT 1
+step 10
+say C 4 116 370         # the third
+step 42
+tap B 1                 # B just before it arrives: parried
+step 8
+snap parry              # the stick flies back, faster
+step 13
+snap reflect            # and strikes the beaver: -1
+say A
+say W 541 432           # beside the west lodge, east of it
+tap LEFT 1
+say I1
+say D 2 6               # down to its last 2 HP: wrecked
+step 30
+tap A 1
+step 11
+snap lodge_hit          # a knock on wood: chips, the lodge shakes
+step 13
+tap A 1
+step 12
+snap lodge_cleared      # the last blow: it falls (the stinger, the big shake)
+say A
+step 14
+snap banner             # LODGE CLEARED, the white mushroom hops out, the pip
+say I0

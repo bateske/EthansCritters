@@ -1,0 +1,16 @@
+# Every benchmark, in the order of a cold start (B1 and B3 ran at boot).
+# Simulator: python chgame/tools/chgame.py --sketch bench/ECBench run tools/scripts/all.txt out/bench_all
+# Board:     the same with --device (debug build, upload, run)
+bench Z1
+bench Z3
+snap card
+bench Z8
+bench Z2
+snap stream
+bench Z4 2000
+snap soak
+bench Z5
+snap draw
+bench Z1 1
+bench Z3 1
+summary

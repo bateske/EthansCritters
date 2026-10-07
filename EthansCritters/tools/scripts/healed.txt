@@ -1,0 +1,79 @@
+# The healed swamp (M8c): the world's second layer on the card, The Rot as
+# it is once its toad is beaten (its willows, reeds and grass alive, no
+# grime, no gnats, its pond in flower), the same as the swamp everywhere
+# else. The game streams it from the first walk begun with the toad dead
+# in the save (round the body The Rot stays The Rot until the win clip
+# covers it), and the willows put back over him come from OCCL's healed
+# copy. First The Rot as it is: behind a dead willow at its west edge, by
+# the gate, on the pond's south shore; then every nest down (D), the
+# brambles part, into the arena, the toad rises, D 6 kills it, the win clip
+# runs, A: the title, A: CONTINUE, and the same three places healed (the
+# phases still turning: the same blocks a frame), and the pond's shore as
+# a GIF (Z: the same 16-17 blocks a frame).
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/healed.txt out/healed
+wait 30
+tap A                   # a new game
+wait 10
+say I1
+say W 720 206           # behind a dead willow's trunk at The Rot's west edge
+step 128
+say O0
+step 1
+snap rot_willow_off     # (no pass: drawn over the tree)
+say O1
+step 1
+snap rot_willow         # its pass redraws the dead tree over him
+say W 776 268           # by the gate, inside
+step 128
+snap rot_gate
+say W 850 262           # the pond's south shore (just south of the arena's trigger)
+step 128
+snap rot_shore
+say W 776 268           # every nest down: the brambles part
+say D 0
+say D 1
+say D 2
+say D 3
+say D 4
+say D 5
+step 300
+hold UP
+step 16
+release                 # into the arena: the fight
+step 110
+say D 6                 # dead
+step 120
+snap body               # The Rot still The Rot round the fading body (the mood lifting)
+step 310                # the win clip, then its times
+tap A
+wait 10                 # the title: CONTINUE
+tap A
+wait 10
+say A                   # TOAD gone, the gate open
+say W 720 206           # the same willow alive, and put back over him alive (OCCL's healed copy)
+step 128
+say O0
+step 1
+snap healed_willow_off
+say O1
+step 1
+snap healed_willow
+say W 776 268
+step 128
+snap healed_gate
+say W 850 262
+step 128
+say Z0
+snap healed_shore_0
+step 16
+snap healed_shore_1
+step 16
+snap healed_shore_2
+step 16
+snap healed_shore_3
+gif healed_shore 32 4
+say Z
+say W 790 180           # into the arena now: no fight, the pond in flower
+step 128
+snap healed_pond
+say A

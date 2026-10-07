@@ -1,0 +1,83 @@
+# The sprite lab (M4, B on the title): the squire's moves and the HUD, then
+# the parade of every critter clip through the frame cache (four at a time:
+# plain, flashing red, fading, mirrored). For the board's card timing:
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/sprite_lab.txt out/sprite_lab
+wait 30
+tap B
+wait 20
+snap lab
+perf start              # (the counters start here)
+hold RIGHT
+wait 30
+snap walk_right
+release
+hold LEFT+UP
+wait 20
+snap walk_up_left
+release
+hold DOWN
+wait 15
+snap walk_down          # still facing left
+release
+wait 10
+tap A 1
+wait 11
+snap thrust             # frame 4: the blade out
+wait 20
+hold B
+wait 12
+snap guard
+release
+wait 12
+tap B 1                 # a tap, and a hit from the front inside the parry window
+say H1
+wait 2
+snap parry
+tap A 1                 # the riposte: parry f3-f5, then the thrust
+wait 4
+snap riposte_swing
+wait 14
+snap riposte_thrust
+wait 30
+hold B                  # guarding: a frontal hit is blocked
+wait 12
+say H2
+wait 1
+snap blocked
+release
+wait 20
+say H2b                 # from behind: taken
+wait 1
+snap hurt_flash
+wait 30
+snap hurt_blink
+wait 70
+say H3                  # 10 - 2 - 3: 5 half hearts left
+wait 70
+snap hearts             # two and a half
+say H5                  # and dead
+wait 50
+snap dead
+perf moves
+say Z
+say R
+wait 60
+# the parade: every critter clip, four at a time
+wait 100
+snap parade1
+wait 150
+snap parade2
+wait 150
+snap parade3
+wait 150
+snap parade4
+wait 150
+snap parade5
+wait 150
+snap parade6
+wait 150
+snap parade7
+wait 150
+snap parade8
+perf parade
+say Z

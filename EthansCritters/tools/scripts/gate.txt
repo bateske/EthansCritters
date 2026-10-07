@@ -1,0 +1,47 @@
+# The bramble gate into The Rot (M7a). While any nest stands the gate is a
+# wall of brambles across the world's open gap (solid: he walks into it and
+# stops). All six nests are knocked down with D from here (banners, the
+# stinger, the saves), THE ROT STIRS (a rumble, a shake), and as its board
+# goes the brambles part (a rasp, a shake, three frames pulling back to the
+# sides); the gate stays open (saved: rot::GATE_OPEN) and he walks through
+# into The Rot, up to the edge of the toad's arena (not into it: that is
+# boss_fight.txt).
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/gate.txt out/gate
+wait 30
+say W 776 372           # south of the gate, on the trail
+say I1
+step 20
+snap shut               # the brambles across the gap; the compass to the nearest nest
+hold UP
+step 40
+release
+snap blocked            # his feet stop at the brambles
+say A
+say D 0
+say D 1
+say D 2
+say D 3
+say D 4
+say D 5                 # the last nest falls: its board, then THE ROT STIRS
+step 30
+snap cleared
+step 90
+snap rot_stirs          # THE ROT STIRS: the rumble, the shake
+step 120
+snap parting_1          # its board gone: the brambles part
+step 12
+snap parting_2
+step 12
+snap parting_3
+step 20
+snap open               # the gap open, as the world is painted
+say A
+hold UP
+step 40
+release
+snap through            # through the gap into The Rot
+hold UP
+step 28
+release
+snap arena_edge         # the toad's pond ahead: the compass points at it
+say A

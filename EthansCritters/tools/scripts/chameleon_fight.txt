@@ -1,0 +1,78 @@
+# The chameleons (M6b), by their brood in Willow Hollow (its mood: dimmer,
+# greener). The brood keeps 2 alive while the squire is within 160 px. One
+# puffs out by the brood, sees him and fades out (its idle frames dithered
+# 16 -> 2 over half a second), then creeps up on him as a shimmer (dithered
+# 2-3, a puff of dust at its feet, a rustle) to 12-28 px to his side; there
+# it shows itself, opens its mouth with a pink glint in it (the tell) and
+# lashes its tongue (Thwip; a heart, the red screen). He turns and thrusts
+# at the next shimmer creeping up: a hit shows it whole (the damage row,
+# the red flash, knocked back). Then (I1) blows into the fading and the
+# creeping ones kill them: the death row, then a dithered fade. Last, the
+# brood is broken down: BROOD CLEARED, the drop, the pip, and Willow
+# Hollow's mood lifts. Last, one led off over 176 px from its brood creeps
+# back to it unseen (HOME) and shows itself there. A prints the actors at
+# each beat.
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/chameleon_fight.txt out/chameleon_fight
+wait 30
+say W 480 154           # in the clearing east of the brood
+step 8
+snap lurk               # one puffs out by the brood
+step 29
+snap fade               # it has seen him: fading out
+step 25
+snap shimmer            # creeping up as a shimmer, dust at its feet
+step 18
+snap appear             # 28 px to his side: it shows itself
+step 15
+snap tell               # the mouth open, the pink glint
+step 11
+snap tongue             # the lash: a heart, the red screen
+say A
+step 94
+tap LEFT 1              # he turns to face the brood ...
+step 10
+tap A 1                 # ... and thrusts at the next one creeping up
+step 12
+snap reveal             # struck unseen: shown whole, the damage row, knocked back
+say A
+say I1                  # (from here he takes no harm)
+tap A 1
+step 20
+tap A 1
+step 20
+tap A 1
+step 20
+tap A 1
+step 18
+snap kill               # one struck again as it fades: the death row
+step 2
+tap A 1
+step 18
+snap kill_shimmer       # the other struck while it creeps: down it goes
+step 24
+snap dead               # their death rows done, fading out
+say A
+say W 456 140           # beside the brood, east of it
+tap LEFT 1
+say D 4 6               # down to its last 2 HP: stripped
+step 30
+tap A 1
+step 11
+snap brood_hit          # a blow on the tangle: chips, it shakes
+step 13
+tap A 1
+step 12
+snap brood_cleared      # it falls (the stinger, the big shake)
+say A
+step 14
+snap banner             # BROOD CLEARED, the white mushroom, the pip
+step 80
+snap lifted             # Willow Hollow's mood lifted
+say I0
+say W 600 252           # south-east of the clearing, the brood gone
+say C 3 580 262 4       # one of its chameleons led off over 176 px from it
+step 70
+snap led_off            # it does not fade and show itself on the spot over and over: a shimmer, heading home
+say A
+step 460
+say A                   # back at the brood: shown again, idle (he is too far to see)

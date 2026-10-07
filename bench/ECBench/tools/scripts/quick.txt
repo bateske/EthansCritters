@@ -1,0 +1,16 @@
+# A short pass over every benchmark (fewer iterations and frames).
+bench Z1
+bench Z3
+bench Z8
+bench Z2 20
+bench Z4 200
+bench Z5
+bench V0
+snap card
+bench V1
+snap stream
+bench V2
+snap soak
+bench V3
+snap draw
+summary

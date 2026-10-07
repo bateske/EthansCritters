@@ -1,0 +1,12 @@
+# The card screen. With the card in, this pulls it out (X0) under the
+# title: the next frame's stream fails, and the game says INSERT CARD; put
+# back (X1), A tries again and the title is back. Run with no card at all
+# (--card naming a missing file), every snap is the card screen.
+wait 30
+say X0
+wait 32             # (A: TRY AGAIN blinks: on)
+snap nocard
+say X1
+tap A
+wait 10
+snap back

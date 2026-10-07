@@ -1,0 +1,108 @@
+# The vertical slice (M5): a fight at the raccoon den by The Landing, beat
+# by beat. W puts the squire west of the den; a raccoon puffs out of it at
+# once (the den keeps up to 3 alive while he is within 160 px, one every
+# 2 s), sees him and gallops in. He thrusts as it comes (a hit: spark, red
+# flash, -1, the game stops 3 ticks, it is knocked back), parries its swipe
+# (B tapped during the rear-up: it is stunned, blinking white) and ripostes
+# (2 damage: it dies, then fades). The next one he blocks (B held: tink,
+# it is pushed back), then he lets one hit him (the hurt row, the red
+# screen, the shake), walks down to a red mushroom and eats it (+1 heart),
+# and comes back to break the den down: intact, battered, wrecked, gone
+# (the stinger, the banner, chips, a white mushroom hops out, the HUD's
+# first pip fills). I1 keeps him from harm while he works on the den (the
+# raccoons keep coming). A prints the actors at each beat.
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/raccoon_fight.txt out/raccoon_fight
+wait 30
+say W 250 640
+step 3
+snap den                # the den: the first raccoon appearing in a puff
+hold RIGHT
+step 10
+release
+step 18
+snap chase              # it has seen him: galloping in
+tap A 1
+step 11
+snap thrust_hit         # the blade meets it: hit-stop, spark, red flash, -1
+say A
+step 6
+snap knocked            # knocked back, staggered
+step 19
+snap tell               # back at him, rearing up: the tell
+step 12
+tap B 1
+step 6
+snap parry              # B just before the swipe: parried (sparks, the game stops 4 ticks)
+say A
+step 8
+snap stunned            # stunned a second, blinking white
+tap A 1
+step 19
+snap riposte            # A after the parry: the riposte, 2 damage
+say A
+step 18
+snap dying              # the death row, then a dithered fade
+hold B                  # the next one (3 s after the first): he guards facing it
+step 117
+say A
+step 1
+snap block              # its swipe on the guard: tink, it is pushed back
+release                 # and lets the next swipe through
+step 51
+snap hurt               # hit: the hurt row, red flash, the screen flushed red, the shake
+say A
+step 20
+hold DOWN+LEFT          # down to the red mushroom by the bushes
+step 9
+hold DOWN
+step 40
+release
+say Z
+step 2
+snap eat                # he is hurt, so he eats it: +1 heart
+say A
+say I1                  # (from here he takes no harm: the den takes a while)
+hold UP+RIGHT
+step 54
+say Z
+hold UP
+step 14
+say Z
+hold RIGHT
+step 30
+release
+say Z
+tap A 1
+step 11
+snap den_hit1           # a knock on wood: chips, the den shakes
+step 13
+tap A 1
+step 11
+step 13
+tap A 1
+step 11
+snap den_battered       # three blows: battered
+step 13
+tap A 1
+step 11
+step 13
+tap A 1
+step 11
+step 13
+tap A 1
+step 12
+snap den_wrecked        # six: wrecked (this thrust was asked for as the last ended: it follows at once)
+step 13
+tap A 1
+step 11
+step 13
+tap A 1
+step 12
+snap den_cleared        # eight: it falls (hit-stop 6, the big shake, the stinger; asked for in the last one's end)
+say A
+step 14
+snap banner             # DEN CLEARED, chips, the white mushroom hopping out, the first pip
+step 40
+snap after              # the drop lies where the den stood; the compass points on
+say I0
+say A

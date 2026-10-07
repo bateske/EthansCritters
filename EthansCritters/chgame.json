@@ -1,0 +1,36 @@
+{
+  "id": "ethans-critters",
+  "title": "ETHAN'S CRITTERS",
+  "author": "bateske",
+  "genre": "Adventure",
+  "license": "MIT",
+  "licenseFiles": [
+    "../LICENSE"
+  ],
+  "sdcard": "../out/card",
+  "cartImage": "docs/cart.png",
+  "screenshots": [
+    {
+      "filename": "docs/gameplay.gif",
+      "title": "Title, the swamp, the fights, the toad"
+    }
+  ],
+  "buttons": [
+    {
+      "control": "D-pad",
+      "action": "Walk in eight directions"
+    },
+    {
+      "control": "A",
+      "action": "Thrust: the sword's swipe; after a parry, a riposte"
+    },
+    {
+      "control": "B",
+      "action": "Hold to guard; tap just before a blow to parry"
+    },
+    {
+      "control": "START",
+      "action": "Pause: the map of the swamp"
+    }
+  ]
+}

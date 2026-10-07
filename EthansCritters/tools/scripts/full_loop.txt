@@ -1,0 +1,64 @@
+# The whole exploration loop (M6b): all six nests cleared, one after the
+# other, with I1 (no harm) and warps (W puts the squire just west of each,
+# facing it; the cleared ones stay cleared). Each is knocked down to its
+# last HP with D and falls to a real thrust: the stinger, the banner, the
+# white mushroom, its pip on the HUD, the save. The compass points to the
+# nearest nest still standing; Willow Hollow's mood lifts with its brood.
+# After the sixth: THE ROT STIRS (a rumble, a shake), and the compass
+# turns ochre and points to The Rot's gate; at the gate, that board gone,
+# its brambles part (gate.txt has it beat by beat).
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/full_loop.txt out/full_loop
+wait 30
+say W 288 638           # the raccoon den by The Landing
+say I1
+step 30
+snap den1               # all six standing: the compass points at this one
+say D 0 7
+tap A 1
+step 30
+snap den1_cleared       # DEN CLEARED, the first pip
+say A
+say W 145 300           # the turtle clutch in Reed Shallows
+step 30
+say D 1 7
+tap A 1
+step 30
+snap clutch_cleared     # CLUTCH CLEARED
+say W 493 444           # the west lodge in the dam pond
+step 30
+say D 2 7
+tap A 1
+step 30
+snap lodge1_cleared     # LODGE CLEARED
+say W 717 534           # the east lodge
+step 30
+say D 3 7
+tap A 1
+step 30
+snap lodge2_cleared
+say W 409 140           # the chameleon brood in Willow Hollow
+step 30
+snap brood              # Willow Hollow's mood, the brood still standing
+say D 4 7
+tap A 1
+step 30
+snap brood_cleared      # BROOD CLEARED
+step 60
+snap hollow_lifted      # its mood eased away
+say A
+say W 864 652           # the second raccoon den, in the south-east
+step 30
+snap den2               # the last one standing: the compass points at it
+say D 5 7
+tap A 1
+step 30
+snap den2_cleared       # DEN CLEARED: all six pips
+step 90
+snap rot_stirs          # THE ROT STIRS: a rumble, the screen shakes
+step 60
+snap compass_gate       # the compass, ochre now, points to The Rot's gate
+say A
+say W 776 344           # at the bramble gate
+step 20
+snap at_gate
+say I0

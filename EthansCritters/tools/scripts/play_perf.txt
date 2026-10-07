@@ -1,0 +1,82 @@
+# What a play frame costs: the squire walks across the swamp with the camera
+# panning every way, then thrusts and guards (new frames for the cache),
+# then the pacing under an added load (J: microseconds after gfx_wait()).
+# `step` draws a frame per logic tick, as the board does while frames fit
+# (`wait` would catch up three ticks a frame). For the board's card timing:
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/play_perf.txt out/play_perf
+# perf: rnd = the average from gfx_wait() to the flush, max = the worst, us.
+# Z: PLAY (frames drawn, at 30 fps, over the 7.9 ms budget, mode switches,
+# the mode now, average and worst us after gfx_wait(), card commands and
+# blocks) | SPOOL (the frame cache's fetches, commands, blocks, misses,
+# deferred, misses at draw time, its worst fetch).
+wait 30
+tap A                   # the squire at the hut's door
+step 4
+say Z0
+perf start              # (the counters start here)
+hold RIGHT
+step 240                # east along the trodden path
+hold UP
+step 200                # north across the meadow
+hold RIGHT
+step 200                # east along the beaver pond's north shore, wading
+hold DOWN+RIGHT
+step 100                # into the pond until the deep water stops him
+hold DOWN
+step 100                # (still stopped: the camera stands)
+hold LEFT
+step 200                # west through the shallows past the lodge
+hold UP
+step 200                # north again
+hold LEFT
+step 150
+release
+perf walk
+say Z
+snap walk_end
+say Z0
+perf start
+hold A                  # thrust right
+step 1
+release
+step 24
+hold LEFT
+step 2
+hold A                  # thrust left
+step 1
+release
+step 24
+hold B                  # guard
+step 30
+release
+step 4
+hold RIGHT+A            # a thrust on the move
+step 1
+hold RIGHT
+step 30
+hold DOWN
+step 30
+release
+step 10
+perf moves
+say Z
+snap moves_end
+# The pacing: 5 ms more work a frame puts the world's 3.5-4.6 ms over the
+# 7.9 ms budget, so the screen drops to 30 fps (a frame every second tick)
+# after 4 of 8 frames; without it, back to 60 after ~2 s under 6.9 ms.
+say Z0
+say J 5000
+hold RIGHT
+step 120
+release
+perf loaded
+say Z
+snap at30
+say Z0
+say J 0
+hold LEFT
+step 200
+release
+perf unloaded
+say Z
+snap back60

@@ -1,0 +1,52 @@
+# The win (M7b): the toad killed with the debug D 6, then the win clip and
+# the title with the best time. Every nest down with D, through the opened
+# gate into the arena (I1: no harm), the toad rises and croaks; D 6 kills
+# it (the long hit-stop, the death row, the fade, the brambles part); the
+# win clip (Path F, its own dawn palette): the toad's body sinking in The
+# Rot's murk, the mist rising over it, lifting off the swamp healed, the
+# squire raising his sword, THE SWAMP IS QUIET; held, the time played since
+# the new game and the best time under it; A: the title, now with the best
+# time and the choice: CONTINUE (blinking) or NEW GAME; RIGHT picks NEW
+# GAME, A: every nest standing again, the clock from 0 (A, Z).
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/win.txt out/win
+wait 30
+tap A                   # a new game
+wait 10
+say W 776 268           # just inside The Rot, by the gate
+say I1
+say D 0
+say D 1
+say D 2
+say D 3
+say D 4
+say D 5                 # all six: THE ROT STIRS, the brambles part
+step 300
+hold UP
+step 16
+release                 # into the arena: the fight
+step 110
+snap toad               # risen, croaking its name
+say D 6                 # dead
+step 120
+snap fading             # the death row, the fade
+step 120
+snap clip_start         # the win clip: the toad's body sinking in the murk
+step 50
+snap clip_mist          # the mist risen over it
+step 40
+snap clip_dawn          # lifting at dawn off the healed pond
+step 100
+snap times              # held: the time played (the clock stopped at the toad's death) and the best time
+tap A
+wait 10
+snap title_best         # the title: BEST, CONTINUE / NEW GAME
+wait 30
+snap title_blink
+tap RIGHT
+wait 6
+snap new_game_picked
+tap A
+wait 10
+say A                   # every nest standing again
+say Z
+snap fresh              # a new game at the hut

@@ -1,0 +1,16 @@
+# The title's loop (M7b): 16 frames at 125 ms streamed from CRITTERS.DAT
+# into the framebuffer (Path F), PRESS A blinking over it: the reeds sway,
+# glints drift on the pond, the squire breathes, a raccoon peeks round the
+# bush and blinks, the turtle blinks, the beaver bobs. No save yet: no
+# best time and no CONTINUE (title_save's snaps in win.txt have them).
+#   CHSD_SIM_CMD_US=832 CHSD_SIM_BLK_US=222 ec run tools/scripts/title_loop.txt out/title_loop
+wait 30
+snap loop_a
+perf boot           # (the counters start here: the first frame opened the card)
+wait 15
+snap loop_b         # 2 frames of the loop on: the reeds over, the glints moved
+wait 21
+snap loop_c         # the raccoon blinking
+wait 45
+perf title          # every frame streams its 16 blocks
+snap loop_d
