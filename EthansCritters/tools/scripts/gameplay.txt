@@ -1,107 +1,133 @@
-# The README's reel (docs/gameplay.gif, `ec gif`): the title's loop, a walk
-# out of The Landing, the swamp standing still while it moves (the ambient
-# phases: reeds swaying, ripples, the swell, lily pads), a raccoon fight by
-# its den, a beaver's ambush from the water, a chameleon fading in and
-# lashing, the willows over the squire, the pause map, the giant toad rising
-# out of The Rot's pond, its death, the win clip, and The Rot healed. Each
-# clip its own recording, named in the order it is shown (rec start 3: 20
-# frames a second); W, D and I1 set the scenes between them.
-# (It runs in `ec check` like every script; `ec gif` joins the clips.)
+# The README's reel (docs/gameplay.gif): the takes. tools/reel.py shoots this
+# script, keeping every frame of each take (`rec start` .. `rec stop NAME`),
+# and cuts the reel from them by its edit list (CUT: each shot's in and out
+# ticks, how it hands over to the next). The takes run long on purpose: the
+# edit chooses. In order, as a game goes: the title; a raccoon at its den by
+# The Landing, parried and run through, and the den broken; a beaver's ambush
+# from the water; a chameleon creeping up in Willow Hollow, turned and run
+# through, and the map with one den crossed; the map again with five; the
+# last one falling far off and THE ROT STIRS; into the arena, the giant toad
+# rising out of the murk and croaking its name; its hop dodged, its tongue
+# parried, the riposte, the killing blow, its death; the win clip. W, D and
+# I set the scenes between the takes.
+# The inputs are timed to the tick (the parries to the critters' and the
+# toad's tells, which draw on the shared RNG): a change to any step count, or
+# to the game's AI or timings, moves every later beat. Re-time from the
+# changed take on with reel.py --sheets (each take's frames, numbered by tick).
+# Takes are named, not numbered: CHGame's `chgame gif` (./ec gif) joins
+# NN_name clips with hard cuts, and finding none it leaves the reel alone.
+# (`ec check` runs this script like every script, at rec's EVERY.)
 wait 30
-rec start 3
-wait 108
-rec stop 01_title
-tap A                   # a new game
-wait 4
-rec start 3
-hold RIGHT
-wait 27
-hold UP+RIGHT
-wait 9
-release
-rec stop 02_explore
-say W 352 404           # Reed Shallows' east pond, standing still: the phases (ambient.txt's spot)
-step 124                # (the region's name gone)
-rec start 3
-wait 128                # two cycles of the four phases, 16 ticks each: the reeds' wave, the ripples, the swell, the lilies
-rec stop 03_ambient
-say W 250 640           # by the raccoon den: a fight (raccoon_fight.txt's beats)
+rec start 3             # the title's loop, nearly three times round (then a new game)
+wait 330
+tap A
+wait 120
+rec stop title
+say W 280 640           # beside the raccoon den at The Landing: one puffs out at once
 step 3
 rec start 3
-hold RIGHT
-wait 10
-release
-wait 18
-tap A 1
-wait 50
-tap B 1
-wait 15
-tap A 1
-wait 40
-rec stop 04_raccoon
-say W 556 428           # in the shallows by the west lodge: a beaver's ambush
-step 30
-rec start 3
-wait 82
-tap LEFT 1
-tap A 1
-wait 24
-rec stop 05_beaver
-say W 480 154           # by the chameleons' brood in Willow Hollow
-step 28
-rec start 3
-wait 84
-rec stop 06_chameleon
+step 55                 # it comes at him and rears up: the tell
+tap B 1                 # B just before the swipe: parried, stunned
+step 20
+tap A 1                 # the riposte
+step 22
+tap A 1                 # and a blow: it dies
+step 36
 say I1
-say W 336 540           # the lone willow north of the hut: up behind its trunk
-step 2
+say D 0 4               # (the den down to its last blow)
+tap A 1                 # DEN CLEARED, the white mushroom hops out
+step 180
+rec stop den
+say I0
+say W 556 428           # in the shallows by the west lodge (beaver_fight.txt's beats)
 rec start 3
-hold UP
-wait 30
-hold RIGHT
-wait 18
+step 8                  # a beaver puffs up by the lodge
+step 19                 # it dives
+step 33                 # rings on the water, coming his way
+step 35                 # up beside him
+step 17                 # the bite: the red screen
+step 22
+tap LEFT 1              # he turns on it
+tap A 1
+step 11
+say I1
+tap A 1
+step 20
+tap A 1                 # the third blow: the burst of chips and water
+step 112
+rec stop beaver
+say I0
+say W 480 154           # Willow Hollow, by the chameleons' brood (chameleon_fight.txt's beats)
+rec start 3
+step 70                 # one puffs out by the brood, sees him, fades and creeps up as a shimmer
+tap LEFT 1              # he turns to face it
+step 20
+hold B                  # guarding as it shows itself and gapes: the pink tell
+step 22                 # the lash on the guard: tink
 release
-rec stop 07_willows
-rec start 3
-tap START 1             # the pause map: the fog lifted where he has walked
-wait 50
+say I1
+tap A 1                 # the riposte: it dies, and fades
+step 60
+tap START 1             # the map: the first den crossed, the fog lifted where he has been
+step 120
+rec stop chameleon
 tap START 1
-wait 6
-rec stop 08_map
-say W 776 268           # into The Rot: every nest down, the brambles part
-say D 0
-say D 1
+say D 1                 # (the clutch, both lodges and the brood down: five of six)
 say D 2
 say D 3
 say D 4
-say D 5
-step 300
+step 400
+say I0
+say W 776 372           # south of the bramble gate, on the trail
+step 30
+rec start 3             # the map: the fog lifted where he has been, five nests crossed
+step 40
+tap START 1
+step 150
+tap START 1
+step 40
+rec stop map
+rec start 3
+say D 5                 # the last nest falls far off: its board, THE ROT STIRS, the brambles part
+step 270
+hold UP
+step 70                 # through the gap into The Rot
+release
+step 20
+rec stop gate
+say W 776 268           # just inside The Rot, by the gate (boss_fight.txt's beats)
+step 10
+rec start 3
 hold UP
 step 16
+release                 # into the arena: the brambles close behind him
+step 10
+step 30                 # the toad rises out of the murk
+step 40                 # its name on a board
+step 120
+rec stop toad
+say I1                  # (no harm from here: the beats are timed to the toad's own)
+rec start 3
+step 29                 # it crouches: a shadow grows at his feet
+hold LEFT
+step 28                 # out from under it: it comes down on nothing
 release
+step 10
+hold UP
+step 6                  # level with it, within its tongue's reach
+release
+tap RIGHT 1             # facing it
+step 101                # it sits, then gapes: the tell
+tap B 1                 # B just before the lash: parried, stunned
 step 12
-rec start 3
-wait 120
-rec stop 09_toad
-say D 6                 # dead (the debug D 6)
-rec start 3
-wait 75
-rec stop 10_toad_dies
-step 180
-rec start 3
-wait 180
-rec stop 11_win
-tap A                   # the title (BEST, CONTINUE / NEW GAME)
-wait 10
-tap A                   # CONTINUE: the swamp with The Rot healed (the card's second world layer)
-wait 10
-say W 726 238           # beside the willows at The Rot's west edge, alive again
-step 124
-rec start 3
-wait 48
-rec stop 12_healed_willow
-say W 790 180           # The Rot's pond in flower, where the toad rose
-step 124
-rec start 3
-wait 64
-rec stop 13_healed_pond
+tap A 1                 # the riposte
+step 16
+tap A 1
+step 16
+say D 6 1               # (down to its last HP)
+tap A 1                 # the killing blow: the long hit-stop, the death row, the fade
+step 300
+rec stop fight
+rec start 3             # the win clip
+step 300
+rec stop win

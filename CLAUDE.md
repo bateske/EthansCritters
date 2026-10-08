@@ -26,7 +26,7 @@ milestones M0-M8; docs/streaming-report.md records how they came out.
 | `EthansCritters/tools/assets/` | `sheets.py` (the source sheets as data), `quantise.py`, `palette.py` (the colours, the remap tables; REMAP_SEPIA since M7b), `props.py` (built art: nests, mushrooms, puff, stick, the bramble gate, the sword's swipe arc), `packbank.py` (card section BANK, `src/assets/Bank.*`), `bosspack.py` (the toad: card section TOAD in row bands, and each frame again in red for the hit flash; `src/assets/Boss.*`) |
 | `EthansCritters/tools/card/` | `cardfile.py` (CRITTERS.DAT's header and sections), `clip.py` (the Path F clip format), `title.py` (the title: the still and its 16-frame loop), `clips.py` (M7b: renders the clips TITL, DEAD, WINC, PMAP; cached in `out/art/clips.cache`, previews in `out/art/clips/`) |
 | `EthansCritters/chgame.json`, `tools/cart.py`, `tools/export_cart.py`, `docs/cart.png` | the cart (CHGame's `spec/chgame.md`): what the exporter needs to know, the cover's recipe (artkit; the game's own sprites and tileset at 1x, the title screen's own lettering from `tools/card/title.py`), the one-command export (`out/EthansCritters.chgame`: card, build, cover, export, the cart's cover, verify) and the cover itself. The exporter (`tools/chcart`), `boxart.py` and `artkit` are the CHGame checkout's (`../CHGame` or `$CHGAME_ROOT`, pip-installed), not vendored: see The cart below |
-| `README.md`, `EthansCritters/README.md`, `EthansCritters/docs/gameplay.gif` | the project's README (the experiment's numbers, building, the card, the patches), the game's (CHGame's game-README format), the reel (`tools/scripts/gameplay.txt`, `./ec gif`, <= 1 MB) |
+| `README.md`, `EthansCritters/README.md`, `EthansCritters/docs/gameplay.gif` | the project's README (the experiment's numbers, building, the card, the patches), the game's (CHGame's game-README format), the reel (`tools/scripts/gameplay.txt`'s takes cut by `tools/reel.py`, <= 1 MB); `docs/banner.png` the banner (`tools/card/banner.py`); `BUILDING.md` building, the card, the cart, the layout (out of the README) |
 | `docs/streaming-report.md` | the experiment's write-up for the CHGame author (M8e): what was streamed, the architecture, every board number, the simulator's estimates (labelled), the budgets by milestone, what worked, the patch set and proposals for the library, the upstreaming steps, the board runs still to do. Keep it in step when a board number comes in |
 
 ## Commands (from the project root; `ec.cmd` on cmd/PowerShell, `./ec` in Git Bash)
@@ -42,7 +42,8 @@ milestones M0-M8; docs/streaming-report.md records how they came out.
 | Size report | `./ec size --top 30` |
 | World paint + previews (`out/world/`, `phases.gif`, `healed.png`; mkcard runs it, cached by input hash; 8 paints, ~26 s) | `python EthansCritters/tools/world/paint.py` |
 | The clips again + previews (`out/art/clips/`; mkcard runs it, cached by input hash) | `python EthansCritters/tools/card/clips.py [--force]` |
-| The README's GIF (`EthansCritters/docs/gameplay.gif`) | `./ec gif` |
+| The README's GIF (`EthansCritters/docs/gameplay.gif`: shoot the takes, cut them; `--no-shoot` cuts again, `--sheets` numbers every take's frames; not `./ec gif`, which finds no `NN_` clips and stops) | `python EthansCritters/tools/reel.py` |
+| The README's banner (`docs/banner.png`: the world, the cast, the title's lettering; 320x88 at 4x) | `python EthansCritters/tools/card/banner.py` |
 | Board probe (safe) | `./ec uploader probe` |
 | The cart, `out/EthansCritters.chgame` (needs the CHGame checkout) | `python EthansCritters/tools/export_cart.py [--no-build] [--no-art]` |
 | A release (`out/release/`: `EthansCritters-<v>.chgame`, `-sdcard.zip`, `release-notes.md`; `--publish`: tag `v<ECRT_VERSION>`, push it, `gh release create`) | `python tools/release.py [--publish]` |
@@ -489,13 +490,41 @@ blocks). The simulator's card can be set to match with
   nests down and the gate open, the map again, The Rot's olive back after
   it), `win.txt` (every nest down, into the arena, `D 6` kills the toad,
   the win clip frame by frame, the times, the title with BEST and the
-  choice, NEW GAME: the nests back), `gameplay.txt` (the README's reel:
-  `./ec gif` records and joins its clips; since M8e 13 clips, 905 KB after
-  the playtest round (940 before), with
-  the ambient phases standing still by Reed Shallows' pond (03) and The Rot
-  healed after the win (12, 13): keep it under 1 MB).
+  choice, NEW GAME: the nests back), `gameplay.txt` (the README's reel's
+  takes: see The reel below).
   `play_walk.txt` and `boss_fight.txt` changed at their ends (START now
   pauses; after the toad: the win clip, its times, A, the title).
+- The reel (2026-10-07, `tools/reel.py`, `tools/scripts/gameplay.txt`):
+  the README's GIF cut like a trailer, at the author's ask (the 13 hard
+  cuts of 0.5-3 s, each ending on a 700 ms frozen frame, were too fast to
+  follow). gameplay.txt records long takes (title, den, beaver, chameleon
+  with the map opened, map with five nests down, gate, toad, fight, win);
+  reel.py shoots it keeping every frame (`out/reel/*.raw`) and cuts by its
+  edit list `CUT`: each shot's in and out ticks, `dip N` (into soot through
+  the game's Bayer dither and out), `mix N` (a dithered dissolve: the map
+  with one cross into the map with five), `thin` (see below), `hold` (the
+  end card only). 32 s, 14 shots, 951 KB: the title 4.5 s; scenes of 3-4 s,
+  each with its setup (the region's name, the critter coming), the beat
+  (a parry and riposte, the beaver's bite, the chameleon's lash turned)
+  and its payoff held a moment (DEN CLEARED and the mushroom, the burst,
+  the map); THE ROT STIRS; the toad rising, its name; the dodged hop, the
+  parried tongue, the killing blow, the death row and fade; the win clip
+  and THE SWAMP IS QUIET held 1.1 s (the clip's times would show at tick
+  114 of `win`), a dip to soot, and the loop back to the title whole. The
+  staging: the den fight beside the den (no walk: a walk is ~10 KB a
+  frame), the toad's hop dodged left and up so its next move is the tongue
+  (|dy| <= 10, 20..54 px off), B at the tell + ~16, the blows inside its
+  72-tick stun; I1 from the fight on. The budget: a frame where the camera
+  moves (pan, shake, a red screen) costs ~10 KB at 2x, one where only
+  actors move ~0.3 KB, a dip ~40 KB, a hard cut ~9 KB; so the takes keep
+  the camera still and the long shakes (the den falling, the toad's croak
+  and the killing blow) keep every 3rd frame, the rest every 2nd. Checked:
+  every delay >= 50 ms, the rebuild byte-identical, `ec run` of the script
+  plain. Every input is timed to the tick and the beats draw on the shared
+  RNG: a change to a step count, the AI or a timing moves every later beat
+  (re-time from that take on with `--sheets`). Animated WebP would carry
+  the same cut in ~40% of the bytes (lossless; 8 minutes to encode at
+  method 6) but CHGame's format is `docs/gameplay.gif`.
 - The clips (`tools/card/clips.py`): composed from the painted world
   (`world_idx()`, ambient phase 0; the win clip's dawn shot from the
   world's healed layer, the one the game streams after the win), the

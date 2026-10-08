@@ -64,7 +64,7 @@ The game reads its art from `CRITTERS.DAT` in the root of the SD card. The
 first time it sees a new `CRITTERS.DAT` it reads the whole file once
 (STIRRING THE SWAMP, about 20 seconds): a card is slow on its first read of
 freshly copied data. To build it and put it on the board, see the project's
-[README](../README.md#building-and-the-card). It needs the CHGame board
+[BUILDING.md](../BUILDING.md). It needs the CHGame board
 package ([Installing](https://github.com/bateske/CHGame#installing)).
 
 For the handheld's SD game menu, download the game from the project's
