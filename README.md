@@ -52,8 +52,6 @@
 
 ## About the game
 
-<img src="EthansCritters/docs/gameplay.gif" alt="Ethan's Critters gameplay" align="left" hspace="12">
-
 Walk a squire through one big swamp, break the six critter nests that have
 turned it against you, then go through the brambles into The Rot and beat
 OLD GULLET, the giant toad behind it all.
@@ -62,7 +60,9 @@ It is also an experiment: how far can unique art and animation go when it
 is streamed from the SD card every frame, on a 48 MHz RISC-V with 20 KB of
 RAM? Nothing the player sees is tiled or packed.
 
-<br clear="left">
+<div align="center">
+  <img src="EthansCritters/docs/gameplay.gif" alt="Ethan's Critters gameplay">
+</div>
 
 ### Controls
 
