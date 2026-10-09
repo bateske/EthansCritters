@@ -80,7 +80,16 @@ static uint8_t wait(bool tok) {
 // bit. Only CMD0 and CMD8 are checked by a card in SPI mode (CRC is left
 // off): their CRCs are the two constants. R1 arrives within 8 bytes; bit 7
 // set means nothing answered.
+//
+// One idle byte goes first: the SD spec's N_RC, at least 8 clocks between a
+// response and the next command (Physical Layer Simplified Specification,
+// SPI mode timing, 7.5). Many cards do without it; a strict one (a SanDisk
+// 32 GB, "SK32G") is still finishing its last response, takes the command
+// misaligned (CMD0 answered 01, then C1 7F, then every answer 6 bits off)
+// and stops answering until it loses power. The bootloader's sd.c does the
+// same. It costs one byte per command, not per block.
 static uint8_t cmd(uint8_t c, uint32_t arg) {
+    xfer(0xFF);
     xfer((uint8_t)(0x40 | c));
     for (int sh = 24; sh >= 0; sh -= 8) xfer((uint8_t)(arg >> sh));
     xfer(c == 8 ? 0x87 : 0x95);
