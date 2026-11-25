@@ -1,0 +1,504 @@
+From 6b4ee65badbd2f3d9d22973ffbc555988401d842 Mon Sep 17 00:00:00 2001
+From: bateske <kevin@bateske.com>
+Date: Tue, 24 Nov 2026 17:26:57 -0800
+Subject: [PATCH] chgame P6: CHGame Rev1 and Rev 1.5, backported from upstream
+
+The Rev1 pins from upstream's c917cda (board package 0.4.0), under
+ARDUINO_CHGAME_REV1 / CHGFX_BL_PIN so rev0's image is unchanged: the
+buttons, the buzzer on TIM2 CH2 / PA1 (held low when silent), the LED
+on PB10, the card's CS on PB3, and the switched backlight on PB9
+(gfx_begin flushes a black frame, sends DISPON, then lights it).
+
+The tools: --board rev0|rev1 (or $CHGAME_BOARD), builds in
+build/<board>/<release|debug>, rev1 uploads through arduino-cli.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../libraries/CHGame/src/chgame/Audio.cpp     | 90 +++++++++++++++++++
+ .../libraries/CHGame/src/chgame/Input.cpp     | 35 +++++++-
+ .../CHGame/libraries/CHGfx/src/CHGfx.cpp      | 39 ++++++++
+ .../CHGame/libraries/CHSd/src/SdSpi.cpp       | 18 +++-
+ tools/chgame.py                               | 15 +++-
+ tools/device.py                               | 46 ++++++++--
+ 6 files changed, 227 insertions(+), 16 deletions(-)
+
+diff --git a/platform/board/arduino/CHGame/libraries/CHGame/src/chgame/Audio.cpp b/platform/board/arduino/CHGame/libraries/CHGame/src/chgame/Audio.cpp
+index e3e3754..29faeab 100644
+--- a/platform/board/arduino/CHGame/libraries/CHGame/src/chgame/Audio.cpp
++++ b/platform/board/arduino/CHGame/libraries/CHGame/src/chgame/Audio.cpp
+@@ -5,6 +5,10 @@
+ // them with TIM1 channel 2 on
+ // PB10 (the library's pin setup), driven by the core's 1 kHz SysTick hook
+ // (osSystickHandler), so no other timer is used.
++//
++// CHGame Rev1 (ARDUINO_CHGAME_REV1) moves the sound to TIM2 channel 2 on PA1,
++// which switches a MOSFET under a magnetic buzzer fed from VSYS, and the LED
++// to PB10; PB9 is the backlight there (CHGfx's) and is never touched here.
+ #include <Arduino.h>
+ #include "Audio.h"
+ 
+@@ -68,6 +72,78 @@ static uint16_t ledT = 0;
+ 
+ extern "C" volatile uint32_t CFGHR_tmpB;        // GPIOB CFGHR is write-only: go through the shadow
+ 
++#if defined(ARDUINO_CHGAME_REV1)
++// CHGame Rev1: TIM2 channel 2 on PA1 (TIM2 remap 000). PA1 high switches the
++// buzzer's coil on, so PA1 must never rest high: a stopped timer holding its
++// output high would be DC through the coil and its transistor. Silence is the
++// channel forced low (OC2M = 100), with PA1 left on the timer; PA1's mode is
++// set here once and never from tone() or the SysTick interrupt.
++//
++// TIM2 is an advanced-control timer on the CH32X035 (RM chapter 12: break,
++// dead time, complementary outputs), so it needs MOE like TIM1. Only CC2E is
++// enabled: CH1 would be PA0 (VBUS sense, never driven), and C2N, BKIN and
++// ETR map to pins this package does not have.
++static const uint16_t CH2_PWM1 = 0x6800;        // CHCTLR1: OC2M = 110 (PWM 1), OC2PE
++static const uint16_t CH2_LOW  = 0x4800;        // CHCTLR1: OC2M = 100 (forced low), OC2PE
++
++static void hwInit() {
++    RCC->APB2PCENR |= RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOA;
++    RCC->APB1PCENR |= RCC_APB1Periph_TIM2;
++    GPIOA->BCR = 1u << 1;                                     // PA1's output latch low
++    // TIM2_RM, PCFR1[20:18], to 000: CH2 on PA1. A masked write: the other
++    // remaps (and SW_CFG) stay. (The vendor's GPIO_PinRemapConfig names
++    // other bits on this chip.)
++    AFIO->PCFR1 = AFIO->PCFR1 & ~(7u << 18);
++    TIM2->CTLR1 = 0; TIM2->CTLR2 = 0; TIM2->SMCFGR = 0; TIM2->DMAINTENR = 0;
++    TIM2->CCER = 0;
++    TIM2->CHCTLR1 = CH2_LOW;                                  // silent until tone()
++    TIM2->CHCTLR2 = 0;
++    TIM2->PSC = 47;                                           // 1 MHz
++    TIM2->RPTCR = 0;
++    TIM2->ATRLR = 999;
++    TIM2->CH2CVR = 0;
++    TIM2->CNT = 0;
++    TIM2->BDTR = 0x8000;                                      // MOE; no break, no dead time
++    TIM2->CCER = 0x10;                                        // CC2E alone
++    TIM2->SWEVGR = 1;
++    TIM2->INTFR = 0;
++    // PA1 to the timer last, once its channel is driving low: alternate-
++    // function push-pull. CFGLR reads back, so a masked write.
++    GPIOA->CFGLR = (GPIOA->CFGLR & ~(15u << 4)) | (11u << 4);
++    running = false; lastHz = 0;
++}
++
++// As Rev0's tone() below (the same timing, ATRLR and CH2CVR preloaded), on
++// TIM2. Under 16 Hz a period is more than 65,536 counts: ATRLR would wrap and
++// the duty land beyond it, which holds PA1 high, so those count as silence.
++static void tone(uint16_t hz, bool smooth) {
++    if (hz < 16) hz = 0;
++    if (hz == lastHz) return;
++    lastHz = hz;
++    if (!hz) {
++        TIM2->CHCTLR1 = CH2_LOW;                    // low at once, whatever the counter does
++        TIM2->CH2CVR = 0; TIM2->SWEVGR = 1; TIM2->CTLR1 = 0; TIM2->INTFR = 0;
++        running = false;
++        return;
++    }
++    uint32_t period = (1000000u + hz / 2u) / hz;
++    if (period < 2) period = 2;
++    uint32_t duty = soft ? period / 8 : period / 2;
++    if (smooth && running) {
++        TIM2->ATRLR = period - 1;
++        TIM2->CH2CVR = duty;
++        return;
++    }
++    running = true;
++    TIM2->CTLR1 = 0;
++    TIM2->ATRLR = period - 1;
++    TIM2->CH2CVR = duty;
++    TIM2->SWEVGR = 1;
++    TIM2->INTFR = 0;
++    TIM2->CHCTLR1 = CH2_PWM1;
++    TIM2->CTLR1 = 0x81;
++}
++#else
+ static void pb10(uint32_t nibble) {
+     uint32_t v = (CFGHR_tmpB & ~(15u << 8)) | (nibble << 8);
+     CFGHR_tmpB = v;
+@@ -123,6 +199,7 @@ static void tone(uint16_t hz, bool smooth) {
+     TIM1->INTFR = 0;
+     TIM1->CTLR1 = 0x81;
+ }
++#endif  // ARDUINO_CHGAME_REV1
+ 
+ // MIDI note -> Hz: the top octave (C8..B8), shifted down.
+ static uint16_t noteHz(uint8_t n) {
+@@ -222,11 +299,19 @@ extern "C" void osSystickHandler(void) {
+ 
+ void begin(const Effect *effects, uint8_t count, bool o) {
+     table = effects; (void)count;               // (the count documents the table)
++#if defined(ARDUINO_CHGAME_REV1)
++    RCC->APB2PCENR |= RCC_APB2Periph_GPIOB;
++    GPIOB->BCR = 1u << 10;                                         // the LED off (active high) ...
++    uint32_t v = (CFGHR_tmpB & ~(15u << 8)) | (3u << 8);           // ... then PB10: push-pull output
++    CFGHR_tmpB = v;
++    GPIOB->CFGHR = v;
++#else
+     RCC->APB2PCENR |= RCC_APB2Periph_GPIOB;
+     uint32_t v = (CFGHR_tmpB & ~(15u << 4)) | (3u << 4);          // PB9 LED: push-pull output
+     CFGHR_tmpB = v;
+     GPIOB->CFGHR = v;
+     GPIOB->BCR = 1u << 9;
++#endif
+     setOn(o);
+ }
+ 
+@@ -327,8 +412,13 @@ void update() {
+         case LED_TRIPLE: lit = (ledT % 16) < 8; if (ledT > 48) ledPattern = 0; break;
+         case LED_PARTY:  lit = (ledT % 8) < 4; if (ledT > 240) ledPattern = 0; break;
+     }
++#if defined(ARDUINO_CHGAME_REV1)
++    if (lit && ledPattern) GPIOB->BSHR = 1u << 10;              // the LED, PB10 (PB9 is the backlight)
++    else GPIOB->BCR = 1u << 10;
++#else
+     if (lit && ledPattern) GPIOB->BSHR = 1u << 9;
+     else GPIOB->BCR = 1u << 9;
++#endif
+ }
+ 
+ }  // namespace audio
+diff --git a/platform/board/arduino/CHGame/libraries/CHGame/src/chgame/Input.cpp b/platform/board/arduino/CHGame/libraries/CHGame/src/chgame/Input.cpp
+index 8fa6138..3c1cdc0 100644
+--- a/platform/board/arduino/CHGame/libraries/CHGame/src/chgame/Input.cpp
++++ b/platform/board/arduino/CHGame/libraries/CHGame/src/chgame/Input.cpp
+@@ -6,6 +6,23 @@ CHGame chgame;
+ #ifndef CHSIM
+ // Direct INDR reads: one register load per port instead of eight
+ // digitalRead() calls through the pin map.
++#if defined(ARDUINO_CHGAME_REV1)
++// CHGame Rev1: UP PB0, DOWN PB1, LEFT PC3, RIGHT PC0, A PB11, B PB6,
++// SELECT PB7, START PB8 (platform/board/docs/hardware-pinmap.md).
++uint8_t chgame_readButtons() {
++    uint32_t b = ~GPIOB->INDR, c = ~GPIOC->INDR;
++    uint8_t m = 0;
++    if (b & (1u << 11)) m |= A_BUTTON;
++    if (b & (1u << 6))  m |= B_BUTTON;
++    if (b & (1u << 0))  m |= UP_BUTTON;
++    if (b & (1u << 1))  m |= DOWN_BUTTON;
++    if (c & (1u << 3))  m |= LEFT_BUTTON;
++    if (c & (1u << 0))  m |= RIGHT_BUTTON;
++    if (b & (1u << 8))  m |= START_BUTTON;
++    if (b & (1u << 7))  m |= SELECT_BUTTON;
++    return m;
++}
++#else
+ uint8_t chgame_readButtons() {
+     uint32_t b = ~GPIOB->INDR, c = ~GPIOC->INDR;
+     uint8_t m = 0;
+@@ -19,6 +36,7 @@ uint8_t chgame_readButtons() {
+     if (b & (1u << 7))  m |= SELECT_BUTTON;
+     return m;
+ }
++#endif  // ARDUINO_CHGAME_REV1
+ #endif
+ 
+ #ifndef CHSIM
+@@ -32,7 +50,22 @@ extern "C" volatile uint32_t CFGHR_tmpB, CFGHR_tmpC;   // CFGHR is write-only: u
+ #endif
+ 
+ void CHGame::boot() {
+-#ifndef CHSIM
++#if !defined(CHSIM) && defined(ARDUINO_CHGAME_REV1)
++    // CHGame Rev1. Switches to GND, no external pull-ups. One masked write
++    // per register: PB0 UP, PB1 DOWN, PB6 B, PB7 SELECT (CFGLR), PB8 START,
++    // PB11 A (CFGHR, through the core's shadow: it does not read back),
++    // PC0 RIGHT, PC3 LEFT (GPIOC CFGLR, which does). Not touched: PB5 (the
++    // same pad as PB1: it must never drive), PB3 and PB4 (SD_CS and LCD_DC,
++    // CHGfx's), PC14/PC15 (test pads; USB CC on Rev 1.5) and PA0 (VBUS sense).
++    RCC->APB2PCENR |= RCC_APB2Periph_GPIOB | RCC_APB2Periph_GPIOC;
++    GPIOB->CFGLR = (GPIOB->CFGLR & ~(NIB(0) | NIB(1) | NIB(6) | NIB(7))) |
++                   PU(0) | PU(1) | PU(6) | PU(7);
++    CFGHR_tmpB = (CFGHR_tmpB & ~(NIB(0) | NIB(3))) | PU(0) | PU(3);
++    GPIOB->CFGHR = CFGHR_tmpB;
++    GPIOB->BSHR = (1u << 0) | (1u << 1) | (1u << 6) | (1u << 7) | (1u << 8) | (1u << 11);
++    GPIOC->CFGLR = (GPIOC->CFGLR & ~(NIB(0) | NIB(3))) | PU(0) | PU(3);
++    GPIOC->BSHR = (1u << 0) | (1u << 3);
++#elif !defined(CHSIM)
+     // Switches to GND, no external pull-ups. One masked write per register:
+     // PB1 A, PB3 LEFT, PB4 UP, PB6 B, PB7 SELECT (CFGLR), PB8 START (CFGHR),
+     // PC14 DOWN, PC15 RIGHT (CFGHR).
+diff --git a/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.cpp b/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.cpp
+index df7b8ed..482d7a8 100644
+--- a/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.cpp
++++ b/platform/board/arduino/CHGame/libraries/CHGfx/src/CHGfx.cpp
+@@ -5,6 +5,9 @@
+  *   PA5 = SCK, PA7 = MOSI, PA6 = MISO (unused by the panel)
+  *   PA4 = LCD_CS, PB0 = LCD_DC, PB12 = LCD_RST, PB11 = SD_CS
+  * The panel and the microSD slot share SPI1, so SD_CS is parked high.
++ * CHGame Rev1's variant (variant_CHGame_Rev1.h) defines its own CHGFX_*
++ * pins: PB4 = LCD_DC, PB3 = SD_CS, and PB9 = the backlight (CHGFX_BL_*),
++ * which begin() keeps dark until the panel shows the framebuffer (black).
+  */
+ #include "CHGfx_internal.h"
+ 
+@@ -27,6 +30,13 @@ extern "C" {
+ #define PIN_SDCS_PORT CHGFX_SDCS_PORT
+ #define PIN_SDCS_BIT  (1u << CHGFX_SDCS_PIN)
+ 
++/* A switched backlight (CHGFX_BL_PORT / CHGFX_BL_PIN, active high): only a
++ * board variant that has one defines it (CHGame Rev1: PB9, held off by a
++ * pull-down). Without it nothing below touches a backlight. */
++#if defined(CHGFX_BL_PIN) && !defined(CHGFX_BL_PORT)
++#error "CHGFX_BL_PIN is defined without CHGFX_BL_PORT"
++#endif
++
+ /* CFGHR IS WRITE-ONLY ON THE CH32X035. Reading it back does not return
+  * what was written, which is why the vendor GPIO driver keeps a RAM
+  * shadow per port (ch32x035_gpio.c, seeded with the 0x44444444 reset
+@@ -364,7 +374,10 @@ static void panelInit(void) {
+     gfx_cmd(ST_GMCTRN1); for (uint8_t i = 0; i < 16; i++) gfx_data8(gn[i]);
+ 
+     gfx_cmd(ST_NORON);  spiWait(); delay(10);
++#ifndef CHGFX_BL_PIN
+     gfx_cmd(ST_DISPON); spiWait(); delay(100);
++#endif
++    /* (A switched backlight: DISPON comes after the first frame, begin().) */
+ 
+     CS_HIGH();
+ }
+@@ -428,6 +441,15 @@ static void applyColorMode(void) {
+ 
+ void gfx_begin(uint8_t spiDiv, uint8_t colorMode) {
+     gpioInit();
++#ifdef CHGFX_BL_PIN
++    /* The backlight stays dark until the glass shows a defined picture: the
++     * panel's RAM holds noise after power-up, and the reset and wake-up
++     * below would light it (or whatever a bootloader left there). Level
++     * first, then the mode, as for the control pins; PB8..PB15 go through
++     * the CFGHR shadow (cfgPin), so later pin set-ups keep it an output. */
++    CHGFX_BL_PORT->BCR = 1u << CHGFX_BL_PIN;
++    cfgPin(CHGFX_BL_PORT, CHGFX_BL_PIN, CFG_GP_PP);
++#endif
+     spiInit(spiDiv);
+     dmaInit();
+     panelReset();
+@@ -444,6 +466,23 @@ void gfx_begin(uint8_t spiDiv, uint8_t colorMode) {
+ 
+     s_sending = -1;
+     s_ready   = -1;
++#ifdef CHGFX_BL_PIN
++    /* The framebuffer onto the glass, and only then the light (upstream
++     * CHGfx 1.3.3, CHGame Rev1). Until the sketch draws, the framebuffer is
++     * all palette index 0, which the palette just set makes black, so the
++     * first thing lit is a black screen: one frame (8.2 ms in 12 bpp), sent
++     * as every frame is (the async flush, so interrupts must be on, as in
++     * setup()). The frame goes into the panel's RAM while the display is
++     * still off, and only then DISPON: the glass is redrawn from RAM once a
++     * refresh (16 ms), and a light switched on at once showed one refresh
++     * of the power-up noise. The 100 ms after DISPON covers several. */
++    gfx_flushAsync();
++    gfx_wait();
++    CS_LOW();
++    gfx_cmd(ST_DISPON); spiWait(); delay(100);
++    CS_HIGH();
++    CHGFX_BL_PORT->BSHR = 1u << CHGFX_BL_PIN;
++#endif
+ }
+ 
+ void gfx_setSpiDiv(uint8_t div) {
+diff --git a/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.cpp b/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.cpp
+index 0f2c823..83faaeb 100644
+--- a/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.cpp
++++ b/platform/board/arduino/CHGame/libraries/CHSd/src/SdSpi.cpp
+@@ -34,6 +34,16 @@ static const uint8_t BR_RUN = 1;                // 12 MHz: polled bytes are slow
+ // the compiler fold it into wait() (16 B less than two).
+ static const uint32_t WAIT_US = 1000000, INIT_US = 1000000;
+ 
++// The card's chip select: PB11 on CHGame Rev0, PB3 on Rev1 (where PB11 is
++// the A button). The panel's, PA4, is the same on both.
++#if defined(ARDUINO_CHGAME_REV1)
++#define SD_CS_PORT GPIOB
++#define SD_CS_BIT  (1u << 3)
++#else
++#define SD_CS_PORT GPIOB
++#define SD_CS_BIT  (1u << 11)
++#endif
++
+ static uint8_t br;
+ static bool hc;                                 // block addressing (SDHC/SDXC)
+ static uint16_t lcdCtlr1;                       // CHGfx's SPI1 setup, put back afterwards
+@@ -57,12 +67,12 @@ static void claim() {
+     spiSet(SPI_MASTER | SPE | ((uint32_t)br << 3));
+     (void)SPI1->DATAR;                          // the panel never reads: RXNE and OVR are set
+     (void)SPI1->STATR;
+-    GPIOB->BCR = 1u << 11;                      // card selected
++    SD_CS_PORT->BCR = SD_CS_BIT;                // card selected
+ }
+ 
+ // The card drives DO until it sees a clock with CS high.
+ static void release() {
+-    GPIOB->BSHR = 1u << 11;
++    SD_CS_PORT->BSHR = SD_CS_BIT;
+     xfer(0xFF);
+     spiSet(lcdCtlr1);
+ }
+@@ -128,9 +138,9 @@ bool init() {
+     GPIOA->CFGLR = (GPIOA->CFGLR & ~(0xFul << 24)) | (0x8ul << 24);
+     br = BR_IDENT;
+     claim();
+-    GPIOB->BSHR = 1u << 11;
++    SD_CS_PORT->BSHR = SD_CS_BIT;
+     for (uint32_t k = 10; k; k--) xfer(0xFF);   // >= 74 clocks with CS high
+-    GPIOB->BCR = 1u << 11;
++    SD_CS_PORT->BCR = SD_CS_BIT;
+     bool ok = ident();
+     release();
+     br = BR_RUN;
+diff --git a/tools/chgame.py b/tools/chgame.py
+index d370f61..926b7e5 100644
+--- a/tools/chgame.py
++++ b/tools/chgame.py
+@@ -1,12 +1,14 @@
+ """chgame: the one entry point for the CHGame tools.
+ 
+-    chgame [--sketch NAME|DIR] <command> [args]
++    chgame [--sketch NAME|DIR] [--board rev0|rev1] <command> [args]
+ 
+ From inside a game's folder (or any folder below it) the sketch is found by
+ itself; from anywhere else pass --sketch with a game's or app's name
+ (CHFour, CHSDtoUSB, Hello) or its folder. `pip install -e .` in the
+ repository root makes the `chgame` command; `python tools/chgame.py` is the
+-same thing uninstalled.
++same thing uninstalled. --board (else $CHGAME_BOARD, else rev0) is the board
++`build`, `upload`, `run --device` and `size` are for; builds go to
++build/<board>/release or build/<board>/debug.
+ 
+   build   [--debug] [-D FLAG ...]        compile for the board (release by default), print the size
+   upload  [--debug] [--port P] [--arduino]
+@@ -26,7 +28,7 @@ same thing uninstalled.
+   gif     [--check] [--no-run] [--every N] [--hold MS]
+                                          record the README's docs/gameplay.gif (--check: all games)
+   size    [BUILDDIR] [--top N] [--symbols]
+-                                         flash and RAM report of a build (default build/release)
++                                         flash and RAM report of a build (default build/<board>/release)
+   audio   OUTDIR [--only NAME ...]       the sound effects and songs as WAV, with a hash each
+   uploader ARGS ...                      the uploader itself: probe, info, flash, selfupdate, burn ...
+   pack    ...                            .CHG packages (tools/chgpack.py)
+@@ -158,7 +160,8 @@ def cmd_gif(a, sketch):
+ def cmd_size(a, sketch):
+     import check_size
+     rest = list(a.rest)
+-    build = rest.pop(0) if rest and not rest[0].startswith("-") else str(sketch / "build" / "release")
++    import device
++    build = rest.pop(0) if rest and not rest[0].startswith("-") else str(device.build_dir(sketch))
+     return check_size.main([build, *rest])
+ 
+ 
+@@ -186,6 +189,8 @@ def main(argv=None):
+     ap = argparse.ArgumentParser(prog="chgame", description=__doc__,
+                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+     ap.add_argument("--sketch", help="a game's or app's name (CHFour, CHSDtoUSB, Hello) or folder")
++    ap.add_argument("--board", choices=("rev0", "rev1"),
++                    help="the board to build and upload for (default: $CHGAME_BOARD, else rev0)")
+     sub = ap.add_subparsers(dest="cmd", required=True, metavar="command")
+ 
+     p = sub.add_parser("build", help="compile for the board and print the size")
+@@ -233,6 +238,8 @@ def main(argv=None):
+     # The pass-through commands take whatever follows them as it is.
+     a, rest = ap.parse_known_args(argv)
+     a.rest = rest
++    if a.board:
++        os.environ["CHGAME_BOARD"] = a.board
+     if rest and a.cmd in {"build", "upload", "sim", "run", "shot"}:
+         ap.error(f"unrecognized arguments: {' '.join(rest)}")
+     sketch = None
+diff --git a/tools/device.py b/tools/device.py
+index 2a309eb..cfc9522 100644
+--- a/tools/device.py
++++ b/tools/device.py
+@@ -26,6 +26,13 @@ does the 1200-baud touch, the flash, the verify and the restart itself;
+ `--arduino` uses `arduino-cli upload` and the board package's Go tool
+ instead, the path an IDE user takes. `run` and `shot` talk to the sketch
+ through its tools/chsim/chdrive.py. Needs the CHGame board package 0.2.4+.
++
++The board (Ethan's Critters patch P6, from upstream's Rev1 work): `--board
++rev0|rev1`, else $CHGAME_BOARD, else rev0. A build goes to
++<sketch>/build/<board>/release (or debug), upstream's layout, which its
++`chgame export --no-build` reads. rev1 needs board package 0.4.0, and its
++uploads always go through `arduino-cli upload` with the rev1 FQBN, so the
++board package passes `-device rev1` and the wrong board is refused.
+ """
+ import argparse
+ import subprocess
+@@ -37,16 +44,37 @@ sys.path.insert(0, str(REPO / "tools"))
+ import paths  # noqa: E402
+ 
+ LIBRARIES = paths.LIBRARIES
++import os  # noqa: E402
++
++BOARDS = ("rev0", "rev1")
+ FQBN_DEBUG = "CHGame:ch32v:rev0:opt=oslto,rtlib=nano,periph=game"
+ FQBN_RELEASE = FQBN_DEBUG + ",usb=uploadonly"
+ 
+ 
+-def build(sketch, debug=False, flags=""):
+-    """Compile; returns the build folder (build/release or build/debug)."""
++def board(b=None):
++    """`b`, else $CHGAME_BOARD, else rev0."""
++    b = b or os.environ.get("CHGAME_BOARD") or "rev0"
++    if b not in BOARDS:
++        raise SystemExit(f"{b}: not a board (the boards: {', '.join(BOARDS)})")
++    return b
++
++
++def fqbn(debug=False, b=None):
++    """The FQBN for `b`: rev0's with the board swapped, options kept."""
++    f = FQBN_DEBUG if debug else FQBN_RELEASE
++    return f.replace(":rev0:", f":{board(b)}:", 1)
++
++
++def build_dir(sketch, debug=False, b=None):
++    """Where a build goes: <sketch>/build/<board>/<release|debug>."""
++    return paths.sketch(sketch) / "build" / board(b) / ("debug" if debug else "release")
++
++
++def build(sketch, debug=False, flags="", b=None):
++    """Compile for `b` (board()); returns the build folder (build_dir())."""
+     sketch = paths.sketch(sketch)
+-    out = sketch / "build" / ("debug" if debug else "release")
+-    cmd = ["arduino-cli", "compile", "-b", FQBN_DEBUG if debug else FQBN_RELEASE,
+-           "--build-path", str(out)]
++    out = build_dir(sketch, debug, b)
++    cmd = ["arduino-cli", "compile", "-b", fqbn(debug, b), "--build-path", str(out)]
+     extra = ("-DCHGAME_DEBUG=1 " if debug else "") + flags
+     if extra.strip():
+         cmd += ["--build-property", "build.extra_flags=" + extra.strip()]
+@@ -67,14 +95,15 @@ def image(sketch, out):
+     return Path(out) / f"{paths.sketch(sketch).name}.ino.bin"
+ 
+ 
+-def upload(sketch, out, port=None, arduino=False):
++def upload(sketch, out, port=None, arduino=False, b=None):
+     sketch = paths.sketch(sketch)
++    arduino = arduino or board(b) != "rev0"    # the board package checks the board (-device)
+     from serialcap import find_port
+     port = port or find_port()
+     if not port:
+         raise SystemExit("no CHGame found on USB (VID 16C0:27DD): plug it in, or pass --port")
+     if arduino:
+-        r = subprocess.run(["arduino-cli", "upload", "-b", "CHGame:ch32v:rev0", "-p", port,
++        r = subprocess.run(["arduino-cli", "upload", "-b", fqbn(False, b), "-p", port,
+                             "--input-dir", str(out), str(sketch)], capture_output=True, text=True)
+         if r.returncode:
+             sys.stderr.write(r.stdout + r.stderr)
+@@ -117,6 +146,7 @@ def main(sketch=None, flags=""):
+     ap = argparse.ArgumentParser()
+     if sketch is None:
+         ap.add_argument("--sketch", type=Path, default=Path.cwd(), help="the sketch's folder")
++    ap.add_argument("--board", choices=BOARDS, help="the board (default: $CHGAME_BOARD, else rev0)")
+     sub = ap.add_subparsers(dest="cmd", required=True)
+     for name in ("build", "upload"):
+         p = sub.add_parser(name)
+@@ -132,6 +162,8 @@ def main(sketch=None, flags=""):
+     p.add_argument("out")
+     p.add_argument("--port")
+     a = ap.parse_args()
++    if a.board:
++        os.environ["CHGAME_BOARD"] = a.board
+     sketch = paths.sketch(sketch or a.sketch)
+     if a.cmd == "build":
+         build(sketch, a.debug, flags)
+-- 
+2.53.0.windows.1
+

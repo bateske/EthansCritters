@@ -26,16 +26,17 @@ milestones M0-M8; docs/streaming-report.md records how they came out.
 | `EthansCritters/tools/assets/` | `sheets.py` (the source sheets as data), `quantise.py`, `palette.py` (the colours, the remap tables; REMAP_SEPIA since M7b), `props.py` (built art: nests, mushrooms, puff, stick, the bramble gate, the sword's swipe arc), `packbank.py` (card section BANK, `src/assets/Bank.*`), `bosspack.py` (the toad: card section TOAD in row bands, and each frame again in red for the hit flash; `src/assets/Boss.*`) |
 | `EthansCritters/tools/card/` | `cardfile.py` (CRITTERS.DAT's header and sections), `clip.py` (the Path F clip format), `title.py` (the title: the still and its 16-frame loop), `clips.py` (M7b: renders the clips TITL, DEAD, WINC, PMAP; cached in `out/art/clips.cache`, previews in `out/art/clips/`) |
 | `EthansCritters/chgame.json`, `tools/cart.py`, `tools/export_cart.py`, `docs/cart.png` | the cart (CHGame's `spec/chgame.md`): what the exporter needs to know, the cover's recipe (artkit; the game's own sprites and tileset at 1x, the title screen's own lettering from `tools/card/title.py`), the one-command export (`out/EthansCritters.chgame`: card, build, cover, export, the cart's cover, verify) and the cover itself. The exporter (`tools/chcart`), `boxart.py` and `artkit` are the CHGame checkout's (`../CHGame` or `$CHGAME_ROOT`, pip-installed), not vendored: see The cart below |
-| `README.md`, `EthansCritters/README.md`, `EthansCritters/docs/gameplay.gif` | the project's README (the experiment's numbers, building, the card, the patches), the game's (CHGame's game-README format), the reel (`tools/scripts/gameplay.txt`'s takes cut by `tools/reel.py`, <= 1 MB); `docs/banner.png` the banner (`tools/card/banner.py`); `BUILDING.md` building, the card, the cart, the layout (out of the README) |
+| `README.md`, `EthansCritters/README.md`, `EthansCritters/docs/gameplay.gif` | the project's README (the experiment's numbers, building, the card, the patches), the game's (CHGame's game-README format), the reel (`tools/scripts/gameplay.txt`'s takes cut by `tools/reel.py`, <= 1 MB); `docs/banner.png` the banner and `docs/social.png` the social preview (`tools/card/banner.py`); `BUILDING.md` building, the card, the cart, the layout (out of the README) |
 | `docs/streaming-report.md` | the experiment's write-up for the CHGame author (M8e): what was streamed, the architecture, every board number, the simulator's estimates (labelled), the budgets by milestone, what worked, the patch set and proposals for the library, the upstreaming steps, the board runs still to do. Keep it in step when a board number comes in |
 
 ## Commands (from the project root; `ec.cmd` on cmd/PowerShell, `./ec` in Git Bash)
 
 | What | Command |
 |---|---|
-| Release build + size | `./ec build` |
+| Release build + size (rev0; `build/<board>/release`) | `./ec build` |
+| The same for CHGame Rev1 / Rev 1.5 (`$CHGAME_BOARD` also picks it) | `./ec --board rev1 build` |
 | Debug build | `./ec build --debug` |
-| Upload (release / debug) | `./ec upload [--debug]` |
+| Upload (release / debug; rev1 goes through arduino-cli, which refuses the wrong board) | `./ec [--board rev1] upload [--debug]` |
 | Simulator script | `./ec run tools/scripts/<s>.txt out/<s>` (paths relative to the sketch) |
 | Everything without a board | `./ec check` |
 | Host tests | `./ec test` |
@@ -43,16 +44,17 @@ milestones M0-M8; docs/streaming-report.md records how they came out.
 | World paint + previews (`out/world/`, `phases.gif`, `healed.png`; mkcard runs it, cached by input hash; 8 paints, ~26 s) | `python EthansCritters/tools/world/paint.py` |
 | The clips again + previews (`out/art/clips/`; mkcard runs it, cached by input hash) | `python EthansCritters/tools/card/clips.py [--force]` |
 | The README's GIF (`EthansCritters/docs/gameplay.gif`: shoot the takes, cut them; `--no-shoot` cuts again, `--sheets` numbers every take's frames; not `./ec gif`, which finds no `NN_` clips and stops) | `python EthansCritters/tools/reel.py` |
-| The README's banner (`docs/banner.png`: the world, the cast, the title's lettering; 320x88 at 4x) | `python EthansCritters/tools/card/banner.py` |
+| The README's banner and the repository's social preview (`docs/banner.png` 320x88, `docs/social.png` 320x160, both at 4x: the world, the cast, the title's lettering; the social one is uploaded by hand in GitHub's Settings, Social preview) | `python EthansCritters/tools/card/banner.py` |
 | Board probe (safe) | `./ec uploader probe` |
 | The cart, `out/EthansCritters.chgame` (needs the CHGame checkout) | `python EthansCritters/tools/export_cart.py [--no-build] [--no-art]` |
-| A release (`out/release/`: `EthansCritters-<v>.chgame`, `-sdcard.zip`, `release-notes.md`; `--publish`: tag `v<ECRT_VERSION>`, push it, `gh release create`) | `python tools/release.py [--publish]` |
+| A release (`out/release/`: `EthansCritters-<v>.chgame`, `-sdcard-rev0.zip`, `-sdcard-rev1.zip`, `release-notes.md`; `--publish`: tag `v<ECRT_VERSION>`, push it, `gh release create`) | `python tools/release.py [--publish]` |
 | The cover's previews (`out/art/EthansCritters_{1x,4x,menu}.png`) and the house checks | `python -m artkit show EthansCritters/tools/cart.py --name EthansCritters --out out/art` |
 | Put the card file on the board's SD card (CHSDtoUSB, copy, eject, re-upload) | `python tools/card_sync.py [FILES] [--then release\|debug\|none]` |
 | Another sketch (bench) | `python chgame/tools/chgame.py --sketch bench/ECBench <command>` |
 
-The board package is `CHGame:ch32v@0.3.0-local` (staged from upstream with
-`tools/release/stage.py` in `out/upstream`). FQBN release
+The board package is `CHGame:ch32v@0.4.0-local` (staged from the CHGame
+checkout; 0.4.0 adds the `rev1` board, CHGame Rev1 and Rev 1.5: see Two
+boards below). FQBN release
 `CHGame:ch32v:rev0:opt=oslto,rtlib=nano,periph=game,usb=uploadonly`.
 Python 3.13 with Pillow, pyserial and ziglang (the simulator's compiler is
 `python -m ziglang c++`).
@@ -887,6 +889,23 @@ with its LTO in one partition (CHGame's review follow-ups): the same
 sources now build a release image of 50,180 B (was 50,372: the ~200 B
 this guide estimated for `-flto-partition=one`), RAM 17,800 unchanged.
 The simulator does not use the board package, so its frames are as before.
+
+## Two boards (2026-11-24)
+
+CHGame Rev1 (and Rev 1.5, the same device) moved the pins: buttons, the
+buzzer (TIM2 on PA1, a magnetic buzzer), the LED (PB10), the card's CS
+(PB3), LCD_DC (PB4), and a switched backlight (PB9). Same chip, memory map
+and limits as Rev0; a binary runs on its own board only (target ids `CX35`
+and `CGR1`). The libraries' Rev1 code is upstream's, backported into
+`chgame/` as P6 (`chgame/PATCHES.md`); the game's own code touches no pins.
+`./ec --board rev1 build` makes the Rev1 image; `export_cart.py` builds
+both and the cart carries `rev0.bin` and `rev1.bin`; `release.py` makes a
+card zip per board. Sizes: rev0 release 50,180 B (byte-identical to v1.0's
+with board package 0.4.0-local), rev1 50,264 B (+84: the backlight's first
+frame and DISPON, TIM2); RAM 17,800 B both. Debug: rev0 50,868 B with
+0.4.0's core; **rev1's lean debug build does not fit (48 B over 50,944)**,
+so no scripts run on a Rev1 until a diet. Nothing measured on a Rev1 board
+yet: the board numbers above are all Rev0's.
 
 ## The device
 

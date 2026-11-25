@@ -8,3 +8,6 @@ tools/chsim/build/
 tools/tests/build/
 __pycache__/
 *.pyc
+
+# local Claude Code settings and worktrees
+.claude/

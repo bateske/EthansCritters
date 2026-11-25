@@ -2,7 +2,9 @@
 """Ethan's Critters as a .chgame: the distributable cart the CHGame's SD menu
 installs from (CHGame's spec/chgame.md).
 
-The cart holds the release image, CRITTERS.DAT as the game's SD card file
+The cart holds a release image per board (rev0 and rev1: the CHGame Rev0 and
+the Rev1 / Rev 1.5 handhelds, one binary each, spec/chgame.md "Devices and
+revisions"; a reader picks its board's), CRITTERS.DAT as the game's SD card file
 (the exporter puts it at the card's root, where the game reads it), the
 cover (docs/cart.png, drawn by tools/cart.py), the licence, and what
 chgame.json says (title, author, genre, buttons; the version from config.h,
@@ -11,9 +13,11 @@ spec keeps gameplay GIFs out of carts (the README's reel stays in the repo).
 
 Steps, in order, each stopping the run if it fails:
   1. tools/mkcard.py          the card file and src/assets/CardIndex.h, from the current sources
-  2. ec build                 the release image (build/release/EthansCritters.ino.bin)
+  2. ec --board B build       each board's release image (build/<board>/release/EthansCritters.ino.bin)
   3. tools/cart.py            the cover, docs/cart.png (unless --no-art)
-  4. chgame export --no-build the cart, out/EthansCritters.chgame (--out for another path)
+  4. chgame export --no-build the cart, out/EthansCritters.chgame (--out for another path),
+                              a binary for every board the installed core has (board package
+                              0.4.0 has rev0 and rev1: both must be built in step 2)
   5. chgame cart picture      the cart's own cover (the visual menu's splash at power-on): the same art
   6. chgame cart verify       the spec's checks on the result
 
@@ -35,6 +39,7 @@ ROOT = SKETCH.parent
 CHGAME = pathlib.Path(os.environ.get("CHGAME_ROOT", ROOT.parent / "CHGame"))
 CHGAME_PY = CHGAME / "tools" / "chgame.py"
 EC = ROOT / "chgame" / "tools" / "chgame.py"            # the vendored tools: ec build
+BOARDS = ("rev0", "rev1")                               # the cart's binaries, one per board
 
 
 def run(title, argv, cwd=ROOT):
@@ -48,13 +53,14 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--out", default=str(ROOT / "out" / "EthansCritters.chgame"))
     ap.add_argument("--no-art", action="store_true", help="keep docs/cart.png as it is")
-    ap.add_argument("--no-build", action="store_true", help="keep build/release and the card as they are")
+    ap.add_argument("--no-build", action="store_true", help="keep build/<board>/release and the card as they are")
     a = ap.parse_args(argv)
     if not CHGAME_PY.exists():
         raise SystemExit(f"no CHGame checkout at {CHGAME} (set CHGAME_ROOT): its tools/chcart exports the cart")
     if not a.no_build:
         run("the card file", [SKETCH / "tools" / "mkcard.py"])
-        run("the release build", [EC, "--sketch", SKETCH, "build"])
+        for b in BOARDS:
+            run(f"the release build, {b}", [EC, "--sketch", SKETCH, "--board", b, "build"])
     if not a.no_art:
         run("the cover", [SKETCH / "tools" / "cart.py"])
     out = pathlib.Path(a.out).resolve()

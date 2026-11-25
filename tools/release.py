@@ -15,12 +15,16 @@ What it does:
   2. EthansCritters/tools/export_cart.py: mkcard, the release build, the
      cover, the cart, the spec's checks
   3. out/release/:
-       EthansCritters-<v>.chgame         the cart, for CHGame's tools and menu
-       EthansCritters-<v>-sdcard.zip     the same laid out as a card (chgame cart
-                                         prepare): unzip onto a FAT32 card's root
-       release-notes.md                  what the release page says
+       EthansCritters-<v>.chgame              the cart, for CHGame's tools and menu: a
+                                              binary for each board (rev0, rev1)
+       EthansCritters-<v>-sdcard-<board>.zip  the same laid out as a card for one board
+                                              (chgame cart prepare --device): unzip onto a
+                                              FAT32 card's root. A card is for one board
+                                              (CHGame's docs/hardware-revisions.md: the
+                                              one place a file name says the board)
+       release-notes.md                       what the release page says
   4. --publish: an annotated tag v<v> on HEAD, pushed to origin, and
-     `gh release create` with the notes and both files
+     `gh release create` with the notes and the files
 
 Bump ECRT_VERSION in EthansCritters/config.h and commit before each
 release. Needs the CHGame checkout (../CHGame or $CHGAME_ROOT) for the cart
@@ -40,6 +44,7 @@ SKETCH = ROOT / "EthansCritters"
 OUT = ROOT / "out" / "release"
 CHGAME = pathlib.Path(os.environ.get("CHGAME_ROOT", ROOT.parent / "CHGame"))
 CHGAME_PY = CHGAME / "tools" / "chgame.py"
+BOARDS = {"rev0": "CHGame Rev0", "rev1": "CHGame Rev1 or Rev 1.5"}
 
 
 def sh(argv, capture=False, check=True):
@@ -56,8 +61,10 @@ def version():
     return m.group(1)
 
 
-def notes(v, cart, card_zip):
-    img = (SKETCH / "build" / "release" / "EthansCritters.ino.bin").stat().st_size
+def notes(v, cart, card_zips):
+    img = max((SKETCH / "build" / b / "release" / "EthansCritters.ino.bin").stat().st_size for b in BOARDS)
+    zips = "".join(f"| `{z.name}` ({z.stat().st_size / 1e6:.1f} MB) | The same for a {BOARDS[b]}, ready to copy: "
+                   "unzip it onto the root of a FAT32 microSD card |\n" for b, z in card_zips.items())
     return f"""# Ethan's Critters {v}
 
 A squire, one big swamp, six critter nests and a giant toad, for the CHGame
@@ -67,8 +74,10 @@ handheld. Every pixel of the swamp is streamed off the SD card while you play.
 
 | File | What it is |
 |---|---|
-| `{cart.name}` ({cart.stat().st_size / 1e6:.1f} MB) | The cart: the game for CHGame's SD menu and tools. `chgame cart deploy {cart.name} --card E:\\` lays out a card |
-| `{card_zip.name}` ({card_zip.stat().st_size / 1e6:.1f} MB) | The same, ready to copy: unzip it onto the root of a FAT32 microSD card |
+| `{cart.name}` ({cart.stat().st_size / 1e6:.1f} MB) | The cart, for every board (Rev0, Rev1 and Rev 1.5): the game for CHGame's SD menu and tools. `chgame --board rev1 cart deploy {cart.name} --card E:\\` lays out a card for a Rev1 |
+{zips}
+Take the card zip for your board: Rev1 and Rev 1.5 boards take the `rev1` one. On the other
+board the menu shows the game greyed and will not install it.
 
 ## Playing it
 
@@ -115,26 +124,28 @@ def main(argv=None):
     OUT.mkdir(parents=True, exist_ok=True)
     cart = OUT / f"EthansCritters-{v}.chgame"
     sh([sys.executable, SKETCH / "tools" / "export_cart.py", "--out", cart])
-    card = OUT / "sdcard"
-    shutil.rmtree(card, ignore_errors=True)
-    sh([sys.executable, CHGAME_PY, "cart", "prepare", cart, card])
-    card_zip = OUT / f"EthansCritters-{v}-sdcard.zip"
-    with zipfile.ZipFile(card_zip, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
-        for f in sorted(card.rglob("*")):
-            if f.is_file():
-                z.write(f, f.relative_to(card).as_posix())
-    shutil.rmtree(card)
+    card_zips = {}
+    for b in BOARDS:
+        card = OUT / "sdcard"
+        shutil.rmtree(card, ignore_errors=True)
+        sh([sys.executable, CHGAME_PY, "cart", "prepare", "--device", b, cart, card])
+        card_zip = card_zips[b] = OUT / f"EthansCritters-{v}-sdcard-{b}.zip"
+        with zipfile.ZipFile(card_zip, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+            for f in sorted(card.rglob("*")):
+                if f.is_file():
+                    z.write(f, f.relative_to(card).as_posix())
+        shutil.rmtree(card)
     note_file = OUT / "release-notes.md"
-    note_file.write_text(notes(v, cart, card_zip), encoding="utf-8", newline="\n")
-    print(f"\n{tag}: {cart.name} {cart.stat().st_size:,} B, {card_zip.name} {card_zip.stat().st_size:,} B, "
-          f"notes in {note_file}")
+    note_file.write_text(notes(v, cart, card_zips), encoding="utf-8", newline="\n")
+    print(f"\n{tag}: {cart.name} {cart.stat().st_size:,} B, "
+          + ", ".join(f"{z.name} {z.stat().st_size:,} B" for z in card_zips.values()) + f", notes in {note_file}")
     if not a.publish:
         print("not published (--publish tags, pushes the tag and creates the release)")
         return
     sh(["git", "tag", "-a", tag, "-m", f"Ethan's Critters {v}"])
     sh(["git", "push", "origin", tag])
     sh(["gh", "release", "create", tag, "--title", f"Ethan's Critters {v}", "--notes-file", note_file,
-        cart, card_zip])
+        cart, *card_zips.values()])
     print(f"published {tag}")
 
 

@@ -5,7 +5,7 @@
 // (`ec build`; `ec build --debug` keeps USB Serial for the debug protocol).
 #pragma once
 
-#define ECRT_VERSION    "1.0"
+#define ECRT_VERSION    "1.1"
 
 // The CHGame library's switches: CHGAME_DEBUG (the serial debug protocol;
 // always on in the simulator, on the board only in a debug build).
