@@ -1,12 +1,14 @@
 """chgame: the one entry point for the CHGame tools.
 
-    chgame [--sketch NAME|DIR] <command> [args]
+    chgame [--sketch NAME|DIR] [--board rev0|rev1] <command> [args]
 
 From inside a game's folder (or any folder below it) the sketch is found by
 itself; from anywhere else pass --sketch with a game's or app's name
 (CHFour, CHSDtoUSB, Hello) or its folder. `pip install -e .` in the
 repository root makes the `chgame` command; `python tools/chgame.py` is the
-same thing uninstalled.
+same thing uninstalled. --board (else $CHGAME_BOARD, else rev0) is the board
+`build`, `upload`, `run --device` and `size` are for; builds go to
+build/<board>/release or build/<board>/debug.
 
   build   [--debug] [-D FLAG ...]        compile for the board (release by default), print the size
   upload  [--debug] [--port P] [--arduino]
@@ -26,7 +28,7 @@ same thing uninstalled.
   gif     [--check] [--no-run] [--every N] [--hold MS]
                                          record the README's docs/gameplay.gif (--check: all games)
   size    [BUILDDIR] [--top N] [--symbols]
-                                         flash and RAM report of a build (default build/release)
+                                         flash and RAM report of a build (default build/<board>/release)
   audio   OUTDIR [--only NAME ...]       the sound effects and songs as WAV, with a hash each
   uploader ARGS ...                      the uploader itself: probe, info, flash, selfupdate, burn ...
   pack    ...                            .CHG packages (tools/chgpack.py)
@@ -158,7 +160,8 @@ def cmd_gif(a, sketch):
 def cmd_size(a, sketch):
     import check_size
     rest = list(a.rest)
-    build = rest.pop(0) if rest and not rest[0].startswith("-") else str(sketch / "build" / "release")
+    import device
+    build = rest.pop(0) if rest and not rest[0].startswith("-") else str(device.build_dir(sketch))
     return check_size.main([build, *rest])
 
 
@@ -186,6 +189,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="chgame", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sketch", help="a game's or app's name (CHFour, CHSDtoUSB, Hello) or folder")
+    ap.add_argument("--board", choices=("rev0", "rev1"),
+                    help="the board to build and upload for (default: $CHGAME_BOARD, else rev0)")
     sub = ap.add_subparsers(dest="cmd", required=True, metavar="command")
 
     p = sub.add_parser("build", help="compile for the board and print the size")
@@ -233,6 +238,8 @@ def main(argv=None):
     # The pass-through commands take whatever follows them as it is.
     a, rest = ap.parse_known_args(argv)
     a.rest = rest
+    if a.board:
+        os.environ["CHGAME_BOARD"] = a.board
     if rest and a.cmd in {"build", "upload", "sim", "run", "shot"}:
         ap.error(f"unrecognized arguments: {' '.join(rest)}")
     sketch = None

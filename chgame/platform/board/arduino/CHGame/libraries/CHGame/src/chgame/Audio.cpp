@@ -5,6 +5,10 @@
 // them with TIM1 channel 2 on
 // PB10 (the library's pin setup), driven by the core's 1 kHz SysTick hook
 // (osSystickHandler), so no other timer is used.
+//
+// CHGame Rev1 (ARDUINO_CHGAME_REV1) moves the sound to TIM2 channel 2 on PA1,
+// which switches a MOSFET under a magnetic buzzer fed from VSYS, and the LED
+// to PB10; PB9 is the backlight there (CHGfx's) and is never touched here.
 #include <Arduino.h>
 #include "Audio.h"
 
@@ -68,6 +72,78 @@ static uint16_t ledT = 0;
 
 extern "C" volatile uint32_t CFGHR_tmpB;        // GPIOB CFGHR is write-only: go through the shadow
 
+#if defined(ARDUINO_CHGAME_REV1)
+// CHGame Rev1: TIM2 channel 2 on PA1 (TIM2 remap 000). PA1 high switches the
+// buzzer's coil on, so PA1 must never rest high: a stopped timer holding its
+// output high would be DC through the coil and its transistor. Silence is the
+// channel forced low (OC2M = 100), with PA1 left on the timer; PA1's mode is
+// set here once and never from tone() or the SysTick interrupt.
+//
+// TIM2 is an advanced-control timer on the CH32X035 (RM chapter 12: break,
+// dead time, complementary outputs), so it needs MOE like TIM1. Only CC2E is
+// enabled: CH1 would be PA0 (VBUS sense, never driven), and C2N, BKIN and
+// ETR map to pins this package does not have.
+static const uint16_t CH2_PWM1 = 0x6800;        // CHCTLR1: OC2M = 110 (PWM 1), OC2PE
+static const uint16_t CH2_LOW  = 0x4800;        // CHCTLR1: OC2M = 100 (forced low), OC2PE
+
+static void hwInit() {
+    RCC->APB2PCENR |= RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOA;
+    RCC->APB1PCENR |= RCC_APB1Periph_TIM2;
+    GPIOA->BCR = 1u << 1;                                     // PA1's output latch low
+    // TIM2_RM, PCFR1[20:18], to 000: CH2 on PA1. A masked write: the other
+    // remaps (and SW_CFG) stay. (The vendor's GPIO_PinRemapConfig names
+    // other bits on this chip.)
+    AFIO->PCFR1 = AFIO->PCFR1 & ~(7u << 18);
+    TIM2->CTLR1 = 0; TIM2->CTLR2 = 0; TIM2->SMCFGR = 0; TIM2->DMAINTENR = 0;
+    TIM2->CCER = 0;
+    TIM2->CHCTLR1 = CH2_LOW;                                  // silent until tone()
+    TIM2->CHCTLR2 = 0;
+    TIM2->PSC = 47;                                           // 1 MHz
+    TIM2->RPTCR = 0;
+    TIM2->ATRLR = 999;
+    TIM2->CH2CVR = 0;
+    TIM2->CNT = 0;
+    TIM2->BDTR = 0x8000;                                      // MOE; no break, no dead time
+    TIM2->CCER = 0x10;                                        // CC2E alone
+    TIM2->SWEVGR = 1;
+    TIM2->INTFR = 0;
+    // PA1 to the timer last, once its channel is driving low: alternate-
+    // function push-pull. CFGLR reads back, so a masked write.
+    GPIOA->CFGLR = (GPIOA->CFGLR & ~(15u << 4)) | (11u << 4);
+    running = false; lastHz = 0;
+}
+
+// As Rev0's tone() below (the same timing, ATRLR and CH2CVR preloaded), on
+// TIM2. Under 16 Hz a period is more than 65,536 counts: ATRLR would wrap and
+// the duty land beyond it, which holds PA1 high, so those count as silence.
+static void tone(uint16_t hz, bool smooth) {
+    if (hz < 16) hz = 0;
+    if (hz == lastHz) return;
+    lastHz = hz;
+    if (!hz) {
+        TIM2->CHCTLR1 = CH2_LOW;                    // low at once, whatever the counter does
+        TIM2->CH2CVR = 0; TIM2->SWEVGR = 1; TIM2->CTLR1 = 0; TIM2->INTFR = 0;
+        running = false;
+        return;
+    }
+    uint32_t period = (1000000u + hz / 2u) / hz;
+    if (period < 2) period = 2;
+    uint32_t duty = soft ? period / 8 : period / 2;
+    if (smooth && running) {
+        TIM2->ATRLR = period - 1;
+        TIM2->CH2CVR = duty;
+        return;
+    }
+    running = true;
+    TIM2->CTLR1 = 0;
+    TIM2->ATRLR = period - 1;
+    TIM2->CH2CVR = duty;
+    TIM2->SWEVGR = 1;
+    TIM2->INTFR = 0;
+    TIM2->CHCTLR1 = CH2_PWM1;
+    TIM2->CTLR1 = 0x81;
+}
+#else
 static void pb10(uint32_t nibble) {
     uint32_t v = (CFGHR_tmpB & ~(15u << 8)) | (nibble << 8);
     CFGHR_tmpB = v;
@@ -123,6 +199,7 @@ static void tone(uint16_t hz, bool smooth) {
     TIM1->INTFR = 0;
     TIM1->CTLR1 = 0x81;
 }
+#endif  // ARDUINO_CHGAME_REV1
 
 // MIDI note -> Hz: the top octave (C8..B8), shifted down.
 static uint16_t noteHz(uint8_t n) {
@@ -222,11 +299,19 @@ extern "C" void osSystickHandler(void) {
 
 void begin(const Effect *effects, uint8_t count, bool o) {
     table = effects; (void)count;               // (the count documents the table)
+#if defined(ARDUINO_CHGAME_REV1)
+    RCC->APB2PCENR |= RCC_APB2Periph_GPIOB;
+    GPIOB->BCR = 1u << 10;                                         // the LED off (active high) ...
+    uint32_t v = (CFGHR_tmpB & ~(15u << 8)) | (3u << 8);           // ... then PB10: push-pull output
+    CFGHR_tmpB = v;
+    GPIOB->CFGHR = v;
+#else
     RCC->APB2PCENR |= RCC_APB2Periph_GPIOB;
     uint32_t v = (CFGHR_tmpB & ~(15u << 4)) | (3u << 4);          // PB9 LED: push-pull output
     CFGHR_tmpB = v;
     GPIOB->CFGHR = v;
     GPIOB->BCR = 1u << 9;
+#endif
     setOn(o);
 }
 
@@ -327,8 +412,13 @@ void update() {
         case LED_TRIPLE: lit = (ledT % 16) < 8; if (ledT > 48) ledPattern = 0; break;
         case LED_PARTY:  lit = (ledT % 8) < 4; if (ledT > 240) ledPattern = 0; break;
     }
+#if defined(ARDUINO_CHGAME_REV1)
+    if (lit && ledPattern) GPIOB->BSHR = 1u << 10;              // the LED, PB10 (PB9 is the backlight)
+    else GPIOB->BCR = 1u << 10;
+#else
     if (lit && ledPattern) GPIOB->BSHR = 1u << 9;
     else GPIOB->BCR = 1u << 9;
+#endif
 }
 
 }  // namespace audio

@@ -5,6 +5,9 @@
  *   PA5 = SCK, PA7 = MOSI, PA6 = MISO (unused by the panel)
  *   PA4 = LCD_CS, PB0 = LCD_DC, PB12 = LCD_RST, PB11 = SD_CS
  * The panel and the microSD slot share SPI1, so SD_CS is parked high.
+ * CHGame Rev1's variant (variant_CHGame_Rev1.h) defines its own CHGFX_*
+ * pins: PB4 = LCD_DC, PB3 = SD_CS, and PB9 = the backlight (CHGFX_BL_*),
+ * which begin() keeps dark until the panel shows the framebuffer (black).
  */
 #include "CHGfx_internal.h"
 
@@ -26,6 +29,13 @@ extern "C" {
 #define PIN_RST_BIT   (1u << CHGFX_RST_PIN)
 #define PIN_SDCS_PORT CHGFX_SDCS_PORT
 #define PIN_SDCS_BIT  (1u << CHGFX_SDCS_PIN)
+
+/* A switched backlight (CHGFX_BL_PORT / CHGFX_BL_PIN, active high): only a
+ * board variant that has one defines it (CHGame Rev1: PB9, held off by a
+ * pull-down). Without it nothing below touches a backlight. */
+#if defined(CHGFX_BL_PIN) && !defined(CHGFX_BL_PORT)
+#error "CHGFX_BL_PIN is defined without CHGFX_BL_PORT"
+#endif
 
 /* CFGHR IS WRITE-ONLY ON THE CH32X035. Reading it back does not return
  * what was written, which is why the vendor GPIO driver keeps a RAM
@@ -364,7 +374,10 @@ static void panelInit(void) {
     gfx_cmd(ST_GMCTRN1); for (uint8_t i = 0; i < 16; i++) gfx_data8(gn[i]);
 
     gfx_cmd(ST_NORON);  spiWait(); delay(10);
+#ifndef CHGFX_BL_PIN
     gfx_cmd(ST_DISPON); spiWait(); delay(100);
+#endif
+    /* (A switched backlight: DISPON comes after the first frame, begin().) */
 
     CS_HIGH();
 }
@@ -428,6 +441,15 @@ static void applyColorMode(void) {
 
 void gfx_begin(uint8_t spiDiv, uint8_t colorMode) {
     gpioInit();
+#ifdef CHGFX_BL_PIN
+    /* The backlight stays dark until the glass shows a defined picture: the
+     * panel's RAM holds noise after power-up, and the reset and wake-up
+     * below would light it (or whatever a bootloader left there). Level
+     * first, then the mode, as for the control pins; PB8..PB15 go through
+     * the CFGHR shadow (cfgPin), so later pin set-ups keep it an output. */
+    CHGFX_BL_PORT->BCR = 1u << CHGFX_BL_PIN;
+    cfgPin(CHGFX_BL_PORT, CHGFX_BL_PIN, CFG_GP_PP);
+#endif
     spiInit(spiDiv);
     dmaInit();
     panelReset();
@@ -444,6 +466,23 @@ void gfx_begin(uint8_t spiDiv, uint8_t colorMode) {
 
     s_sending = -1;
     s_ready   = -1;
+#ifdef CHGFX_BL_PIN
+    /* The framebuffer onto the glass, and only then the light (upstream
+     * CHGfx 1.3.3, CHGame Rev1). Until the sketch draws, the framebuffer is
+     * all palette index 0, which the palette just set makes black, so the
+     * first thing lit is a black screen: one frame (8.2 ms in 12 bpp), sent
+     * as every frame is (the async flush, so interrupts must be on, as in
+     * setup()). The frame goes into the panel's RAM while the display is
+     * still off, and only then DISPON: the glass is redrawn from RAM once a
+     * refresh (16 ms), and a light switched on at once showed one refresh
+     * of the power-up noise. The 100 ms after DISPON covers several. */
+    gfx_flushAsync();
+    gfx_wait();
+    CS_LOW();
+    gfx_cmd(ST_DISPON); spiWait(); delay(100);
+    CS_HIGH();
+    CHGFX_BL_PORT->BSHR = 1u << CHGFX_BL_PIN;
+#endif
 }
 
 void gfx_setSpiDiv(uint8_t div) {

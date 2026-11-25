@@ -26,6 +26,13 @@ does the 1200-baud touch, the flash, the verify and the restart itself;
 `--arduino` uses `arduino-cli upload` and the board package's Go tool
 instead, the path an IDE user takes. `run` and `shot` talk to the sketch
 through its tools/chsim/chdrive.py. Needs the CHGame board package 0.2.4+.
+
+The board (Ethan's Critters patch P6, from upstream's Rev1 work): `--board
+rev0|rev1`, else $CHGAME_BOARD, else rev0. A build goes to
+<sketch>/build/<board>/release (or debug), upstream's layout, which its
+`chgame export --no-build` reads. rev1 needs board package 0.4.0, and its
+uploads always go through `arduino-cli upload` with the rev1 FQBN, so the
+board package passes `-device rev1` and the wrong board is refused.
 """
 import argparse
 import subprocess
@@ -37,16 +44,37 @@ sys.path.insert(0, str(REPO / "tools"))
 import paths  # noqa: E402
 
 LIBRARIES = paths.LIBRARIES
+import os  # noqa: E402
+
+BOARDS = ("rev0", "rev1")
 FQBN_DEBUG = "CHGame:ch32v:rev0:opt=oslto,rtlib=nano,periph=game"
 FQBN_RELEASE = FQBN_DEBUG + ",usb=uploadonly"
 
 
-def build(sketch, debug=False, flags=""):
-    """Compile; returns the build folder (build/release or build/debug)."""
+def board(b=None):
+    """`b`, else $CHGAME_BOARD, else rev0."""
+    b = b or os.environ.get("CHGAME_BOARD") or "rev0"
+    if b not in BOARDS:
+        raise SystemExit(f"{b}: not a board (the boards: {', '.join(BOARDS)})")
+    return b
+
+
+def fqbn(debug=False, b=None):
+    """The FQBN for `b`: rev0's with the board swapped, options kept."""
+    f = FQBN_DEBUG if debug else FQBN_RELEASE
+    return f.replace(":rev0:", f":{board(b)}:", 1)
+
+
+def build_dir(sketch, debug=False, b=None):
+    """Where a build goes: <sketch>/build/<board>/<release|debug>."""
+    return paths.sketch(sketch) / "build" / board(b) / ("debug" if debug else "release")
+
+
+def build(sketch, debug=False, flags="", b=None):
+    """Compile for `b` (board()); returns the build folder (build_dir())."""
     sketch = paths.sketch(sketch)
-    out = sketch / "build" / ("debug" if debug else "release")
-    cmd = ["arduino-cli", "compile", "-b", FQBN_DEBUG if debug else FQBN_RELEASE,
-           "--build-path", str(out)]
+    out = build_dir(sketch, debug, b)
+    cmd = ["arduino-cli", "compile", "-b", fqbn(debug, b), "--build-path", str(out)]
     extra = ("-DCHGAME_DEBUG=1 " if debug else "") + flags
     if extra.strip():
         cmd += ["--build-property", "build.extra_flags=" + extra.strip()]
@@ -67,14 +95,15 @@ def image(sketch, out):
     return Path(out) / f"{paths.sketch(sketch).name}.ino.bin"
 
 
-def upload(sketch, out, port=None, arduino=False):
+def upload(sketch, out, port=None, arduino=False, b=None):
     sketch = paths.sketch(sketch)
+    arduino = arduino or board(b) != "rev0"    # the board package checks the board (-device)
     from serialcap import find_port
     port = port or find_port()
     if not port:
         raise SystemExit("no CHGame found on USB (VID 16C0:27DD): plug it in, or pass --port")
     if arduino:
-        r = subprocess.run(["arduino-cli", "upload", "-b", "CHGame:ch32v:rev0", "-p", port,
+        r = subprocess.run(["arduino-cli", "upload", "-b", fqbn(False, b), "-p", port,
                             "--input-dir", str(out), str(sketch)], capture_output=True, text=True)
         if r.returncode:
             sys.stderr.write(r.stdout + r.stderr)
@@ -117,6 +146,7 @@ def main(sketch=None, flags=""):
     ap = argparse.ArgumentParser()
     if sketch is None:
         ap.add_argument("--sketch", type=Path, default=Path.cwd(), help="the sketch's folder")
+    ap.add_argument("--board", choices=BOARDS, help="the board (default: $CHGAME_BOARD, else rev0)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name in ("build", "upload"):
         p = sub.add_parser(name)
@@ -132,6 +162,8 @@ def main(sketch=None, flags=""):
     p.add_argument("out")
     p.add_argument("--port")
     a = ap.parse_args()
+    if a.board:
+        os.environ["CHGAME_BOARD"] = a.board
     sketch = paths.sketch(sketch or a.sketch)
     if a.cmd == "build":
         build(sketch, a.debug, flags)

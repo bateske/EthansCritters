@@ -34,6 +34,16 @@ static const uint8_t BR_RUN = 1;                // 12 MHz: polled bytes are slow
 // the compiler fold it into wait() (16 B less than two).
 static const uint32_t WAIT_US = 1000000, INIT_US = 1000000;
 
+// The card's chip select: PB11 on CHGame Rev0, PB3 on Rev1 (where PB11 is
+// the A button). The panel's, PA4, is the same on both.
+#if defined(ARDUINO_CHGAME_REV1)
+#define SD_CS_PORT GPIOB
+#define SD_CS_BIT  (1u << 3)
+#else
+#define SD_CS_PORT GPIOB
+#define SD_CS_BIT  (1u << 11)
+#endif
+
 static uint8_t br;
 static bool hc;                                 // block addressing (SDHC/SDXC)
 static uint16_t lcdCtlr1;                       // CHGfx's SPI1 setup, put back afterwards
@@ -57,12 +67,12 @@ static void claim() {
     spiSet(SPI_MASTER | SPE | ((uint32_t)br << 3));
     (void)SPI1->DATAR;                          // the panel never reads: RXNE and OVR are set
     (void)SPI1->STATR;
-    GPIOB->BCR = 1u << 11;                      // card selected
+    SD_CS_PORT->BCR = SD_CS_BIT;                // card selected
 }
 
 // The card drives DO until it sees a clock with CS high.
 static void release() {
-    GPIOB->BSHR = 1u << 11;
+    SD_CS_PORT->BSHR = SD_CS_BIT;
     xfer(0xFF);
     spiSet(lcdCtlr1);
 }
@@ -128,9 +138,9 @@ bool init() {
     GPIOA->CFGLR = (GPIOA->CFGLR & ~(0xFul << 24)) | (0x8ul << 24);
     br = BR_IDENT;
     claim();
-    GPIOB->BSHR = 1u << 11;
+    SD_CS_PORT->BSHR = SD_CS_BIT;
     for (uint32_t k = 10; k; k--) xfer(0xFF);   // >= 74 clocks with CS high
-    GPIOB->BCR = 1u << 11;
+    SD_CS_PORT->BCR = SD_CS_BIT;
     bool ok = ident();
     release();
     br = BR_RUN;

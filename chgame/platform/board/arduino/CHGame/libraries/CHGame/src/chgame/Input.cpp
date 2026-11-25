@@ -6,6 +6,23 @@ CHGame chgame;
 #ifndef CHSIM
 // Direct INDR reads: one register load per port instead of eight
 // digitalRead() calls through the pin map.
+#if defined(ARDUINO_CHGAME_REV1)
+// CHGame Rev1: UP PB0, DOWN PB1, LEFT PC3, RIGHT PC0, A PB11, B PB6,
+// SELECT PB7, START PB8 (platform/board/docs/hardware-pinmap.md).
+uint8_t chgame_readButtons() {
+    uint32_t b = ~GPIOB->INDR, c = ~GPIOC->INDR;
+    uint8_t m = 0;
+    if (b & (1u << 11)) m |= A_BUTTON;
+    if (b & (1u << 6))  m |= B_BUTTON;
+    if (b & (1u << 0))  m |= UP_BUTTON;
+    if (b & (1u << 1))  m |= DOWN_BUTTON;
+    if (c & (1u << 3))  m |= LEFT_BUTTON;
+    if (c & (1u << 0))  m |= RIGHT_BUTTON;
+    if (b & (1u << 8))  m |= START_BUTTON;
+    if (b & (1u << 7))  m |= SELECT_BUTTON;
+    return m;
+}
+#else
 uint8_t chgame_readButtons() {
     uint32_t b = ~GPIOB->INDR, c = ~GPIOC->INDR;
     uint8_t m = 0;
@@ -19,6 +36,7 @@ uint8_t chgame_readButtons() {
     if (b & (1u << 7))  m |= SELECT_BUTTON;
     return m;
 }
+#endif  // ARDUINO_CHGAME_REV1
 #endif
 
 #ifndef CHSIM
@@ -32,7 +50,22 @@ extern "C" volatile uint32_t CFGHR_tmpB, CFGHR_tmpC;   // CFGHR is write-only: u
 #endif
 
 void CHGame::boot() {
-#ifndef CHSIM
+#if !defined(CHSIM) && defined(ARDUINO_CHGAME_REV1)
+    // CHGame Rev1. Switches to GND, no external pull-ups. One masked write
+    // per register: PB0 UP, PB1 DOWN, PB6 B, PB7 SELECT (CFGLR), PB8 START,
+    // PB11 A (CFGHR, through the core's shadow: it does not read back),
+    // PC0 RIGHT, PC3 LEFT (GPIOC CFGLR, which does). Not touched: PB5 (the
+    // same pad as PB1: it must never drive), PB3 and PB4 (SD_CS and LCD_DC,
+    // CHGfx's), PC14/PC15 (test pads; USB CC on Rev 1.5) and PA0 (VBUS sense).
+    RCC->APB2PCENR |= RCC_APB2Periph_GPIOB | RCC_APB2Periph_GPIOC;
+    GPIOB->CFGLR = (GPIOB->CFGLR & ~(NIB(0) | NIB(1) | NIB(6) | NIB(7))) |
+                   PU(0) | PU(1) | PU(6) | PU(7);
+    CFGHR_tmpB = (CFGHR_tmpB & ~(NIB(0) | NIB(3))) | PU(0) | PU(3);
+    GPIOB->CFGHR = CFGHR_tmpB;
+    GPIOB->BSHR = (1u << 0) | (1u << 1) | (1u << 6) | (1u << 7) | (1u << 8) | (1u << 11);
+    GPIOC->CFGLR = (GPIOC->CFGLR & ~(NIB(0) | NIB(3))) | PU(0) | PU(3);
+    GPIOC->BSHR = (1u << 0) | (1u << 3);
+#elif !defined(CHSIM)
     // Switches to GND, no external pull-ups. One masked write per register:
     // PB1 A, PB3 LEFT, PB4 UP, PB6 B, PB7 SELECT (CFGLR), PB8 START (CFGHR),
     // PC14 DOWN, PC15 RIGHT (CFGHR).
